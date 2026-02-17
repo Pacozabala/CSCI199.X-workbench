@@ -210,5 +210,5 @@ __marimo__/
 # Working Files
 *.pt
 *.bin
-*.csv
+# *.csv --> I think we'll need this for dataset config
 __pycache__/

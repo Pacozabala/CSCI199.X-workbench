@@ -115,7 +115,7 @@ def evaluate(model, loader):
             true.extend(batch["labels"].numpy())
 
 
-for EPOCH in range(EPOCHS):
+for epoch in range(EPOCHS):
     train_loss = train_epoch(model, train_loader)
     val_f1 = evaluate(model, val_loader)
 

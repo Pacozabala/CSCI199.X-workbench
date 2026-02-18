@@ -113,6 +113,8 @@ def evaluate(model, loader):
 
             preds.extend(predictions)
             true.extend(batch["labels"].numpy())
+    
+    return f1_score(true, preds)
 
 
 for epoch in range(EPOCHS):

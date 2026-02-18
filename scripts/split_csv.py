@@ -14,14 +14,14 @@ def parse_args():
     parser.add_argument(
         "--input",
         type=str,
-        default="../data/MFRC_polarities.csv",
+        default="data/MFRC_polarities.csv",
         help="Path to input CSV file",
     )
 
     parser.add_argument(
         "--output",
         type=str,
-        default="../data/binary_datasets",
+        default="data/binary_datasets",
         help="Output directory for binary datasets",
     )
 

@@ -1,64 +1,134 @@
 import pandas as pd
 import os
+import argparse
+from sklearn.model_selection import train_test_split
 
 # ==========================
-# CONFIG
+# Argument Parser
 # ==========================
-INPUT_CSV = "data/MFRC_polarities.csv"
-OUTPUT_DIR = "../data/lexicons/binary_datasets"
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Prep binary datasets for 10 independent RoBERTa classifiers."
+    )
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+    parser.add_argument(
+        "--input",
+        type=str,
+        default="../data/MFRC_polarities.csv",
+        help="Path to input CSV file",
+    )
+
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="../data/binary_datasets",
+        help="Output directory for binary datasets",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for splitting",
+    )
+
+    parser.add_argument(
+        "--test-size",
+        type=float,
+        default=0.2,
+        help="Proportion reserved for val+test split (default 0.2 → 80/10/10)",
+    )
+
+    return parser.parse_args()
+
 
 # ==========================
-# 1. Load CSV, get columns
+# Main
 # ==========================
-df = pd.read_csv(INPUT_CSV)
+def main():
+    args = parse_args()
 
-df = df[["text", "polarity"]].copy()
-df = df.dropna(subset=["polarity"])
+    INPUT_CSV = args.input
+    OUTPUT_DIR = args.output
+    RANDOM_STATE = args.seed
+    TEST_SIZE = args.test_size
 
-# ==========================
-# 2. Split multi-label rows
-# ==========================
-df["polarity"] = df["polarity"].str.split(",")
-df = df.explode("polarity")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-df["polarity"] = df["polarity"].str.strip()
+    print(f"Input file: {INPUT_CSV}")
+    print(f"Output dir: {OUTPUT_DIR}")
+    print(f"Seed: {RANDOM_STATE}")
+    print(f"Test size (val+test): {TEST_SIZE}")
 
-df = df.drop_duplicates()
+    # ==========================
+    # 1. Load CSV
+    # ==========================
+    df = pd.read_csv(INPUT_CSV)
+    df = df[["text", "polarity"]].copy()
+    df = df.dropna(subset=["polarity"])
 
-# ==========================
-# 3. Get unique labels
-# ==========================
-all_labels = sorted(df["polarity"].unique())
-print(f"Found {len(all_labels)} unique labels:")
-print(all_labels)
+    # ==========================
+    # 2. Split multi-label rows
+    # ==========================
+    df["polarity"] = df["polarity"].str.split(",")
+    df = df.explode("polarity")
+    df["polarity"] = df["polarity"].str.strip()
+    df = df.drop_duplicates()
 
-# ==========================
-# 4. Build binary datasets
-# ==========================
-all_texts = df["text"].unique()
+    # ==========================
+    # 3. Build multi-hot matrix
+    # ==========================
+    all_texts = df["text"].unique()
+    all_labels = sorted(df["polarity"].unique())
 
-for label in all_labels:
-    print(f"Processing label:{label}")
+    print(f"Found {len(all_labels)} labels:")
+    print(all_labels)
 
-    # texts that contain the label
-    positive_texts = df[df["polarity"] == label]["text"].unique()
+    multi_df = pd.DataFrame({"text": all_texts})
 
-    # build binary dataset
-    binary_df = pd.DataFrame({
-        "text": all_texts
-    })
+    for label in all_labels:
+        positive_texts = df[df["polarity"] == label]["text"].unique()
+        multi_df[label] = multi_df["text"].isin(positive_texts).astype(int)
 
-    binary_df["label"] = binary_df["text"].isin(positive_texts).astype(int)
+    # ==========================
+    # 4. Train / Val / Test Split
+    # ==========================
+    train_df, temp_df = train_test_split(
+        multi_df,
+        test_size=TEST_SIZE,
+        random_state=RANDOM_STATE,
+    )
 
-    # remove duplicate binary rows
-    binary_df = binary_df.drop_duplicates()
+    val_df, test_df = train_test_split(
+        temp_df,
+        test_size=0.5,
+        random_state=RANDOM_STATE,
+    )
 
-    # save file
-    safe_label = label.replace(".","_")
-    output_path = os.path.join(OUTPUT_DIR, f"{safe_label}.csv")
-    binary_df.to_csv(output_path, index=False)
-    print(f"Finished dataset for foundation; {safe_label}")
+    print(f"Train size: {len(train_df)}")
+    print(f"Val size: {len(val_df)}")
+    print(f"Test size: {len(test_df)}")
 
-print("Finished.")
+    # ==========================
+    # 5. Save per-label datasets
+    # ==========================
+    for label in all_labels:
+        safe_label = label.replace(".", "_")
+        label_dir = os.path.join(OUTPUT_DIR, safe_label)
+        os.makedirs(label_dir, exist_ok=True)
+
+        train_label = train_df[["text", label]].rename(columns={label: "label"})
+        val_label = val_df[["text", label]].rename(columns={label: "label"})
+        test_label = test_df[["text", label]].rename(columns={label: "label"})
+
+        train_label.to_csv(os.path.join(label_dir, "train.csv"), index=False)
+        val_label.to_csv(os.path.join(label_dir, "val.csv"), index=False)
+        test_label.to_csv(os.path.join(label_dir, "test.csv"), index=False)
+
+        print(f"Saved splits for: {safe_label}")
+
+    print("Finished.")
+
+
+if __name__ == "__main__":
+    main()

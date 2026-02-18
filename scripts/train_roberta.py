@@ -15,9 +15,9 @@ BATCH_SIZE = 16
 LR = 2e-5
 EPOCHS = 1
 
-train_df = pd.read_csv("data/authority_vice/train.csv")
-val_df = pd.read_csv("data/authority_vice/val.csv")
-test = pd.read_csv("data/authority_vice/test.csv")
+train_df = pd.read_csv("data/binary_datasets/authority_vice/train.csv")
+val_df = pd.read_csv("data/binary_datasets/authority_vice/val.csv")
+test = pd.read_csv("data/binary_datasets/authority_vice/test.csv")
 
 class TextDataset(Dataset):
     def __init__(self,texts,labels,tokenizer):

@@ -13,7 +13,7 @@ MODEL_NAME = "roberta-base"
 MAX_LEN = 128
 BATCH_SIZE = 16
 LR = 2e-5
-EPOCHS = 1
+EPOCHS = 2
 
 train_df = pd.read_csv("data/binary_datasets/authority_vice/train.csv")
 val_df = pd.read_csv("data/binary_datasets/authority_vice/val.csv")

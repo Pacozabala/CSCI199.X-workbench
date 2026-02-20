@@ -2,48 +2,41 @@
 
 """
 BoW-based Virtue/Vice Polarity Assignment for MFRC
-Using Moral Foundations Dictionary (MFD)
+Improved Weak Supervision Version
 
-Command line usage:
+Default input directory: data/
+
+Example:
 
 python bow_polarity_assignment.py \
-    --mfd_path data/MFD_original.csv \
-    --mfrc_path data/final_mfrc_data.csv \
-    --output_path data/MFRC_polarities.csv \
-    --use_nltk
+    --output_path outputs/MFRC_polarities.csv \
+    --use_lemma \
+    --use_frequency \
+    --tie_break drop \
+    --drop_zero_signal
 """
 
 import os
 import argparse
 import pandas as pd
 
+DEFAULT_DATA_DIR = "data"
+DEFAULT_MFD = os.path.join(DEFAULT_DATA_DIR, "lexicons/MFD_original.csv")
+DEFAULT_MFRC = os.path.join(DEFAULT_DATA_DIR, "final_mfrc_data.csv")
 
-# =============================
+
+# -----------------------------
 # Argument Parser
-# =============================
+# -----------------------------
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Assign virtue/vice polarity labels to MFRC using MFD (BoW baseline)"
     )
 
     parser.add_argument(
-        "--mfd_path",
-        type=str,
-        required=True,
-        help="Path to MFD CSV file"
-    )
-
-    parser.add_argument(
-        "--mfrc_path",
-        type=str,
-        required=True,
-        help="Path to MFRC CSV file"
-    )
-
-    parser.add_argument(
         "--output_path",
         type=str,
-        required=True,
+        default="data/MFRC_polarities.csv",
         help="Path to save output CSV"
     )
 
@@ -53,12 +46,38 @@ def parse_args():
         help="Use NLTK TweetTokenizer before scoring"
     )
 
+    parser.add_argument(
+        "--use_lemma",
+        action="store_true",
+        help="Use spaCy lemmatization"
+    )
+
+    parser.add_argument(
+        "--use_frequency",
+        action="store_true",
+        help="Use frequency counting instead of set overlap"
+    )
+
+    parser.add_argument(
+        "--tie_break",
+        type=str,
+        default="virtue",
+        choices=["virtue", "vice", "neutral", "drop"],
+        help="How to handle alpha == 0 (default: virtue)"
+    )
+
+    parser.add_argument(
+        "--drop_zero_signal",
+        action="store_true",
+        help="Drop rows where no moral words were found"
+    )
+
     return parser.parse_args()
 
 
-# =============================
+# -----------------------------
 # Normalize Foundations
-# =============================
+# -----------------------------
 
 def normalize_foundations(annotation):
     foundations = annotation.split(',')
@@ -74,9 +93,9 @@ def normalize_foundations(annotation):
     return ','.join(set(foundations))
 
 
-# =============================
+# -----------------------------
 # Main
-# =============================
+# -----------------------------
 
 def main():
 
@@ -89,15 +108,13 @@ def main():
 
     # normalize foundations
     MFRC["annotation"] = MFRC["annotation"].apply(normalize_foundations)
-
     # remove Non-Moral
     MFRC = MFRC[MFRC["annotation"] != "Non-Moral"]
-
     # remove Not Confident
     MFRC = MFRC[MFRC["confidence"] != "Not Confident"]
 
     # build lexicon sets
-    FOUNDATIONS = set(["authority", "fairness", "harm", "ingroup", "purity"])
+    FOUNDATIONS = ["authority", "fairness", "harm", "ingroup", "purity"]
 
     def get_word_set(category, sentiment):
         return set(
@@ -107,22 +124,14 @@ def main():
             ]["word"].str.lower()
         )
 
-    authority_virtue = get_word_set("authority", "virtue")
-    authority_vice = get_word_set("authority", "vice")
+    lexicon = {
+        f: {
+            "virtue": get_word_set(f, "virtue"),
+            "vice": get_word_set(f, "vice")
+        } for f in FOUNDATIONS
+    }
 
-    fairness_virtue = get_word_set("fairness", "virtue")
-    fairness_vice = get_word_set("fairness", "vice")
-
-    harm_virtue = get_word_set("harm", "virtue")
-    harm_vice = get_word_set("harm", "vice")
-
-    ingroup_virtue = get_word_set("ingroup", "virtue")
-    ingroup_vice = get_word_set("ingroup", "vice")
-
-    purity_virtue = get_word_set("purity", "virtue")
-    purity_vice = get_word_set("purity", "vice")
-
-    # Optional NLTK tokenization
+    # Optional NLP tools
     if args.use_nltk:
         print("Using NLTK TweetTokenizer...")
         import nltk
@@ -134,15 +143,28 @@ def main():
             strip_handles=False
         )
 
-        MFRC["text"] = MFRC["text"].apply(
-            lambda x: " ".join(tokenizer.tokenize(str(x)))
-        )
+        # MFRC["text"] = MFRC["text"].apply(
+        #     lambda x: " ".join(tokenizer.tokenize(str(x)))
+        # )
+    
+    if args.use_lemma:
+        import spacy
+        nlp = spacy.load("en_core_web_sm")
+
 
     # Polarity Assignment Function
     def assign_polarity_label(text, annotation):
 
         foundations = annotation.lower().split(",")
-        words = set(str(text).lower().split())
+        text = str(text)
+
+        if args.use_nltk:
+            tokens = tokenizer.tokenize(text)
+        elif args.use_lemma:
+            doc = nlp(text)
+            tokens = [token.lemma_.lower() for token in doc]
+        else:
+            tokens = text.lower().split()
 
         results = []
 
@@ -152,35 +174,38 @@ def main():
             if foundation not in FOUNDATIONS:
                 continue
 
-            if foundation == "authority":
-                virtue_set = authority_virtue
-                vice_set = authority_vice
+            virtue_set = lexicon[foundation]["virtue"]
+            vice_set = lexicon[foundation]["vice"]
 
-            elif foundation == "fairness":
-                virtue_set = fairness_virtue
-                vice_set = fairness_vice
-
-            elif foundation == "harm":
-                virtue_set = harm_virtue
-                vice_set = harm_vice
-
-            elif foundation == "ingroup":
-                virtue_set = ingroup_virtue
-                vice_set = ingroup_vice
-
-            elif foundation == "purity":
-                virtue_set = purity_virtue
-                vice_set = purity_vice
-
-            freq_virtue = len(words & virtue_set)
-            freq_vice = len(words & vice_set)
+            if args.use_frequency:
+                freq_virtue = sum(t in virtue_set for t in tokens)
+                freq_vice = sum(t in vice_set for t in tokens)
+            else:
+                token_set = set(tokens)
+                freq_virtue = len(token_set & virtue_set)
+                freq_vice = len(token_set & vice_set)
 
             alpha = freq_virtue - freq_vice
 
-            if alpha >= 0:
+            # handle zero signal
+            if freq_virtue == 0 and freq_vice == 0:
+                if args.drop_zero_signal:
+                    continue
+            
+            # tie-breaking
+            if alpha > 0:
                 label = "virtue"
-            else:
+            elif alpha < 0:
                 label = "vice"
+            else:
+                if args.tie_break == "virtue":
+                    label = "virtue"
+                if args.tie_break == "vice":
+                    label = "vice"
+                elif args.tie_break == "neutral":
+                    label = "neutral"
+                elif args.tie_break == "drop":
+                    continue
 
             results.append(f"{foundation}.{label}")
 
@@ -202,7 +227,6 @@ def main():
     # Save Output
     # -----------------------------
     os.makedirs(os.path.dirname(args.output_path), exist_ok=True)
-
     MFRC.to_csv(args.output_path, index=False)
 
     print(f"Saved to: {args.output_path}")

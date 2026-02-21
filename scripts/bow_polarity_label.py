@@ -2,11 +2,10 @@
 
 """
 BoW-based Virtue/Vice Polarity Assignment for MFRC
-Improved Weak Supervision Version
 
 Default input directory: data/
 
-Example:
+Example usage:
 
 python bow_polarity_assignment.py \
     --output_path outputs/MFRC_polarities.csv \

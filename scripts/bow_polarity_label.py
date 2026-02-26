@@ -100,6 +100,9 @@ def main():
 
     args = parse_args()
 
+    if args.use_nltk and args.use_lemma:
+        raise ValueError("Choose either --use_nltk OR --use_lemma, not both.")
+
     print("Loading MFD...")
     MFD = pd.read_csv(DEFAULT_MFD)
     print("Loading MFRC...")
@@ -199,7 +202,7 @@ def main():
             else:
                 if args.tie_break == "virtue":
                     label = "virtue"
-                if args.tie_break == "vice":
+                elif args.tie_break == "vice":
                     label = "vice"
                 elif args.tie_break == "neutral":
                     label = "neutral"
@@ -225,7 +228,9 @@ def main():
     # -----------------------------
     # Save Output
     # -----------------------------
-    os.makedirs(os.path.dirname(args.output_path), exist_ok=True)
+    output_dir = os.path.dirname(args.output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     MFRC.to_csv(args.output_path, index=False)
 
     print(f"Saved to: {args.output_path}")

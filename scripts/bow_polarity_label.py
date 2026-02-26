@@ -8,7 +8,7 @@ Default input directory: data/
 Example usage:
 
 python bow_polarity_assignment.py \
-    --output_path outputs/MFRC_polarities.csv \
+    --output_path data/MFRC_polarities.csv \
     --use_lemma \
     --use_frequency \
     --tie_break drop \
@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument(
         "--output_path",
         type=str,
-        default="data/MFRC_polarities.csv",
+        default="data/MFRC_polarity.csv",
         help="Path to save output CSV"
     )
 

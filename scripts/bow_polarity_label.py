@@ -7,8 +7,8 @@ Default input directory: data/
 
 Example usage:
 
-python bow_polarity_assignment.py \
-    --output_path data/MFRC_polarities.csv \
+python bow_polarity_label.py \
+    --output_path data/MFRC_polarity.csv \
     --use_lemma \
     --use_frequency \
     --tie_break drop \
@@ -101,9 +101,9 @@ def main():
     args = parse_args()
 
     print("Loading MFD...")
-    MFD = pd.read_csv(args.mfd_path)
+    MFD = pd.read_csv(DEFAULT_MFD)
     print("Loading MFRC...")
-    MFRC = pd.read_csv(args.mfrc_path)
+    MFRC = pd.read_csv(DEFAULT_MFRC)
 
     # normalize foundations
     MFRC["annotation"] = MFRC["annotation"].apply(normalize_foundations)

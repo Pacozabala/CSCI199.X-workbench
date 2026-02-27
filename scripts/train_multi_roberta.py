@@ -207,7 +207,7 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    label_folder = f"{args.foundation}_{args.pole}"
+    label_folder = "multi_model"
     data_path = os.path.join(args.data_dir, label_folder)
 
     train_df = pd.read_csv(os.path.join(data_path, "train.csv"))

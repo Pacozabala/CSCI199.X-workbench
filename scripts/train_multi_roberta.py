@@ -3,10 +3,13 @@ import argparse
 import torch
 import torch.nn as nn
 import pandas as pd
+import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from transformers import RobertaTokenizer, RobertaModel
 from torch.optim import AdamW
 from sklearn.metrics import f1_score
+
+FOUNDATIONS = ["authority","fairness","harm","ingroup","purity"]
 
 # =========================
 # ARGUMENTS
@@ -15,17 +18,16 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--data_dir", type=str,
-                        default="data/hierarchical_dataset",
-                        help="Base dataset directory")
+                        default="data/hierarchical_dataset")
 
     parser.add_argument("--output_dir", type=str,
-                        default="outputs",
-                        help="Where to save models")
+                        default="outputs")
 
-    parser.add_argument("--epochs", type=int, default=2)
+    parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--max_len", type=int, default=128)
+    parser.add_argument("--lambda_weight", type=float, default=1.0)
 
     return parser.parse_args()
 
@@ -33,11 +35,11 @@ def parse_args():
 # =========================
 # DATASET
 # =========================
-class TextDataset(Dataset):
+class HierarchicalDataset(Dataset):
     def __init__(self, df, tokenizer, max_len):
         self.texts = df["text"].tolist()
-        self.foundation_cols = ["authority","fairness","harm","ingroup","purity"]
-        self.polarity_cols = [f"{f}_pol" for f in self.foundation_cols]
+        self.foundation_cols = FOUNDATIONS
+        self.polarity_cols = [f"{f}_pol" for f in FOUNDATIONS]
         self.df = df
         self.tokenizer = tokenizer
         self.max_len = max_len
@@ -71,6 +73,7 @@ class TextDataset(Dataset):
             "polarity_labels": polarity_labels
         }
 
+
 # =========================
 # MODEL
 # =========================
@@ -80,15 +83,12 @@ class HierarchicalRoBERTa(nn.Module):
 
         self.lambda_weight = lambda_weight
         self.encoder = RobertaModel.from_pretrained("roberta-base")
-
         hidden = self.encoder.config.hidden_size
 
-        # 5 foundation binary heads
         self.foundation_heads = nn.ModuleList(
             [nn.Linear(hidden, 1) for _ in range(5)]
         )
 
-        # 5 polarity ternary heads
         self.polarity_heads = nn.ModuleList(
             [nn.Linear(hidden, 3) for _ in range(5)]
         )
@@ -105,7 +105,7 @@ class HierarchicalRoBERTa(nn.Module):
             attention_mask=attention_mask
         )
 
-        pooled = outputs.last_hidden_state[:, 0]  # CLS token
+        pooled = outputs.last_hidden_state[:, 0]
 
         foundation_logits = torch.cat(
             [head(pooled) for head in self.foundation_heads],
@@ -120,6 +120,7 @@ class HierarchicalRoBERTa(nn.Module):
         loss = None
 
         if foundation_labels is not None:
+
             foundation_loss = self.bce(
                 foundation_logits,
                 foundation_labels
@@ -138,14 +139,11 @@ class HierarchicalRoBERTa(nn.Module):
 
             loss = foundation_loss + self.lambda_weight * polarity_loss
 
-        return {
-            "loss": loss,
-            "foundation_logits": foundation_logits,
-            "polarity_logits": polarity_logits
-        }
+        return loss, foundation_logits, polarity_logits
+
 
 # =========================
-# TRAIN / EVAL
+# TRAIN
 # =========================
 def train_epoch(model, loader, optimizer, device):
     model.train()
@@ -159,14 +157,13 @@ def train_epoch(model, loader, optimizer, device):
 
         optimizer.zero_grad()
 
-        outputs = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            foundation_labels=foundation_labels,
-            polarity_labels=polarity_labels
+        loss, _, _ = model(
+            input_ids,
+            attention_mask,
+            foundation_labels,
+            polarity_labels
         )
 
-        loss = outputs["loss"]
         loss.backward()
         optimizer.step()
 
@@ -175,28 +172,59 @@ def train_epoch(model, loader, optimizer, device):
     return total_loss / len(loader)
 
 
+# =========================
+# EVALUATION
+# =========================
 def evaluate(model, loader, device):
     model.eval()
-    preds = []
-    true = []
+
+    all_found_preds = []
+    all_found_true = []
+
+    all_pol_preds = []
+    all_pol_true = []
 
     with torch.no_grad():
         for batch in loader:
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
+            foundation_labels = batch["foundation_labels"]
+            polarity_labels = batch["polarity_labels"]
 
-            outputs = model(
-                input_ids=input_ids,
-                attention_mask=attention_mask
+            _, foundation_logits, polarity_logits = model(
+                input_ids, attention_mask
             )
 
-            logits = outputs.logits
-            predictions = torch.argmax(logits, dim=1).cpu().numpy()
+            # Foundation predictions
+            found_preds = (torch.sigmoid(foundation_logits) > 0.5).cpu()
 
-            preds = (torch.sigmoid(logits) > 0.5)
-            true.extend(batch["labels"].numpy())
+            all_found_preds.append(found_preds)
+            all_found_true.append(foundation_labels)
 
-    return f1_score(true, preds, average="macro")
+            # Polarity predictions (masked)
+            pol_preds = torch.argmax(polarity_logits, dim=2).cpu()
+
+            mask = foundation_labels == 1
+
+            all_pol_preds.append(pol_preds[mask])
+            all_pol_true.append(polarity_labels[mask])
+
+    foundation_f1 = f1_score(
+        torch.cat(all_found_true).numpy().flatten(),
+        torch.cat(all_found_preds).numpy().flatten(),
+        average="macro"
+    )
+
+    if len(torch.cat(all_pol_true)) > 0:
+        polarity_f1 = f1_score(
+            torch.cat(all_pol_true).numpy(),
+            torch.cat(all_pol_preds).numpy(),
+            average="macro"
+        )
+    else:
+        polarity_f1 = 0.0
+
+    return foundation_f1, polarity_f1
 
 
 # =========================
@@ -207,28 +235,13 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    label_folder = "multi_model"
-    data_path = os.path.join(args.data_dir, label_folder)
-
-    train_df = pd.read_csv(os.path.join(data_path, "train.csv"))
-    val_df = pd.read_csv(os.path.join(data_path, "val.csv"))
-    test_df = pd.read_csv(os.path.join(data_path, "test.csv"))
+    train_df = pd.read_csv(os.path.join(args.data_dir, "train.csv"))
+    val_df = pd.read_csv(os.path.join(args.data_dir, "val.csv"))
 
     tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
-    train_dataset = TextDataset(
-        train_df["text"].tolist(),
-        train_df["label"].tolist(),
-        tokenizer,
-        args.max_len
-    )
-
-    val_dataset = TextDataset(
-        val_df["text"].tolist(),
-        val_df["label"].tolist(),
-        tokenizer,
-        args.max_len
-    )
+    train_dataset = HierarchicalDataset(train_df, tokenizer, args.max_len)
+    val_dataset = HierarchicalDataset(val_df, tokenizer, args.max_len)
 
     train_loader = DataLoader(train_dataset,
                               batch_size=args.batch_size,
@@ -237,31 +250,25 @@ def main():
     val_loader = DataLoader(val_dataset,
                             batch_size=args.batch_size)
 
-    model = HierarchicalRoBERTa(lambda_weight=1.0)
-
+    model = HierarchicalRoBERTa(lambda_weight=args.lambda_weight)
     model.to(device)
 
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
-    print(f"Training {label_folder}")
-    print(f"Train size: {len(train_dataset)}")
-    print(f"Val size: {len(val_dataset)}")
-
     for epoch in range(args.epochs):
         train_loss = train_epoch(model, train_loader, optimizer, device)
-        val_f1 = evaluate(model, val_loader, device)
+        foundation_f1, polarity_f1 = evaluate(model, val_loader, device)
 
-        print(f"Epoch {epoch+1}")
+        print(f"\nEpoch {epoch+1}")
         print(f"Train Loss: {train_loss:.4f}")
-        print(f"Val Macro F1: {val_f1:.4f}")
+        print(f"Foundation Macro F1: {foundation_f1:.4f}")
+        print(f"Polarity Macro F1 (masked): {polarity_f1:.4f}")
 
-    # Save model
-    save_path = os.path.join(args.output_dir, label_folder)
-    os.makedirs(save_path, exist_ok=True)
-    model.save_pretrained(save_path)
-    tokenizer.save_pretrained(save_path)
+    os.makedirs(args.output_dir, exist_ok=True)
+    torch.save(model.state_dict(),
+               os.path.join(args.output_dir, "hierarchical_model.pt"))
 
-    print(f"Model saved to {save_path}")
+    print("\nModel saved.")
 
 
 if __name__ == "__main__":

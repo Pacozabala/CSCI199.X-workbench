@@ -238,6 +238,13 @@ def main():
     train_df = pd.read_csv(os.path.join(args.data_dir, "train.csv"))
     val_df = pd.read_csv(os.path.join(args.data_dir, "val.csv"))
 
+    for col in FOUNDATIONS:
+        train_df[col] = train_df[col].astype(int)
+        val_df[col] = val_df[col].astype(int)
+    for col in [f"{f}_pol" for f in FOUNDATIONS]:
+        train_df[col] = train_df[col].astype(int)
+        val_df[col] = val_df[col].astype(int)
+
     tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
     train_dataset = HierarchicalDataset(train_df, tokenizer, args.max_len)

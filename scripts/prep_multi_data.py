@@ -117,9 +117,7 @@ def main():
     print(f"Val size: {len(val_df)}")
     print(f"Test size: {len(test_df)}")
 
-    # --------------------------
     # 5. Save unified splits
-    # --------------------------
     train_df.to_csv(os.path.join(args.output, "train.csv"), index=False)
     val_df.to_csv(os.path.join(args.output, "val.csv"), index=False)
     test_df.to_csv(os.path.join(args.output, "test.csv"), index=False)

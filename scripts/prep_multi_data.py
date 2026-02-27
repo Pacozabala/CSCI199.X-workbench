@@ -1,3 +1,9 @@
+'''
+Sample usage:
+
+python scripts/prep_multi_data.py
+'''
+
 import pandas as pd
 import os
 import argparse
@@ -21,7 +27,7 @@ def parse_args():
     parser.add_argument(
         "--input",
         type=str,
-        default="data/MFRC_polarities.csv",
+        default="data/MFRC_polarity.csv",
         help="Path to input CSV file",
     )
 

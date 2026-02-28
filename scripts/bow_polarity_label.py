@@ -151,7 +151,7 @@ def main():
     
     if args.use_lemma:
         import spacy
-        nlp = spacy.load("en_core_web_sm")
+        nlp = spacy.load("en_core_web_sm", disable=["parser","ner"])
 
 
     # Polarity Assignment Function

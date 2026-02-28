@@ -71,6 +71,12 @@ def parse_args():
         help="Drop rows where no moral words were found"
     )
 
+    parser.add_argument(
+        "--drop_not_confident",
+        action="store_true",
+        help="Drop rows where annotation is not confident"
+    )
+
     return parser.parse_args()
 
 
@@ -113,7 +119,8 @@ def main():
     # remove Non-Moral
     MFRC = MFRC[MFRC["annotation"] != "Non-Moral"]
     # remove Not Confident
-    MFRC = MFRC[MFRC["confidence"] != "Not Confident"]
+    if args.drop_not_confident:
+        MFRC = MFRC[MFRC["confidence"] != "Not Confident"]
 
     # build lexicon sets
     FOUNDATIONS = ["authority", "fairness", "harm", "ingroup", "purity"]

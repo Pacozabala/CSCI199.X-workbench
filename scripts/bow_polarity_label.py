@@ -151,22 +151,18 @@ def main():
     
     if args.use_lemma:
         import spacy
-        nlp = spacy.load("en_core_web_sm", disable=["parser","ner"])
+        print("Loading spaCy model...")
+        nlp = spacy.load(
+            "en_core_web_sm",
+            disable=["parser", "ner", "tagger"]  # we only need lemmatizer
+        )
 
 
     # Polarity Assignment Function
-    def assign_polarity_label(text, annotation):
+    def assign_polarity_label(tokens, annotation):
 
         foundations = annotation.lower().split(",")
-        text = str(text)
-
-        if args.use_nltk:
-            tokens = tokenizer.tokenize(text)
-        elif args.use_lemma:
-            doc = nlp(text)
-            tokens = [token.lemma_.lower() for token in doc]
-        else:
-            tokens = text.lower().split()
+        token_set = set(tokens)
 
         results = []
 
@@ -183,7 +179,6 @@ def main():
                 freq_virtue = sum(t in virtue_set for t in tokens)
                 freq_vice = sum(t in vice_set for t in tokens)
             else:
-                token_set = set(tokens)
                 freq_virtue = len(token_set & virtue_set)
                 freq_vice = len(token_set & vice_set)
 
@@ -218,12 +213,28 @@ def main():
     # -----------------------------
     print("Assigning polarity labels...")
 
-    MFRC["polarity"] = MFRC.apply(
-        lambda row: ",".join(
-            assign_polarity_label(row["text"], row["annotation"])
-        ),
-        axis=1
-    )
+    if args.use_nltk:
+        MFRC["tokens"] = MFRC["text"].astype(str).apply(
+            lambda x: tokenizer.tokenize(x)
+        )
+    elif args.use_lemma:
+        texts = MFRC["text"].astype(str).tolist()
+
+        docs = list(nlp.pipe(texts, batch_size=512))
+
+        MFRC["tokens"] = [
+            [token.lemma_.lower() for token in doc]
+            for doc in docs
+        ]
+    else:
+        MFRC["tokens"] = MFRC["text"].astype(str).apply(
+            lambda x: x.lower().split()
+        )
+
+    MFRC["polarity"] = [
+    ",".join(assign_polarity_label(tokens, ann))
+    for tokens, ann in zip(MFRC["tokens"], MFRC["annotation"])
+    ]
 
     # -----------------------------
     # Save Output

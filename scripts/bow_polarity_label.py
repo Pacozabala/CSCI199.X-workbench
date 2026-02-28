@@ -154,7 +154,7 @@ def main():
         print("Loading spaCy model...")
         nlp = spacy.load(
             "en_core_web_sm",
-            disable=["parser", "ner", "tagger"]  # we only need lemmatizer
+            disable=["parser", "ner"]  # we only need lemmatizer
         )
 
 

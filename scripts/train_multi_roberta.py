@@ -219,15 +219,11 @@ def evaluate(model, loader, device):
             # foundation predictions
             found_preds = (torch.sigmoid(foundation_logits) > 0.5)
 
-            all_found_preds.append(found_preds)
-            all_found_true.append(foundation_labels)
+            all_found_preds.append(found_preds.cpu())
+            all_found_true.append(foundation_labels.cpu())
 
             # polarity predictions (masked)
             pol_preds = torch.argmax(polarity_logits, dim=2)
-
-            # mask = foundation_labels == 1
-            # all_pol_preds.append(pol_preds[mask])
-            # all_pol_true.append(polarity_labels[mask])
 
             for f in range(5):
                 mask_f = found_preds[:, f] == 1 # predicted foundations mask
@@ -236,24 +232,14 @@ def evaluate(model, loader, device):
                     preds_f = pol_preds[mask_f, f]
                     true_f = polarity_labels[mask_f, f]
 
-                    all_pol_preds[f].append(preds_f)
-                    all_pol_true[f].append(true_f)
+                    all_pol_preds[f].append(preds_f.cpu())
+                    all_pol_true[f].append(true_f.cpu())
         
     foundation_f1 = f1_score(
         torch.cat(all_found_true).numpy().flatten(),
         torch.cat(all_found_preds).numpy().flatten(),
         average="macro"
     )
-
-    # calculate polarity f1 if foundation detected
-    # if len(torch.cat(all_pol_true)) > 0:
-    #     polarity_f1 = f1_score(
-    #         torch.cat(all_pol_true).numpy(),
-    #         torch.cat(all_pol_preds).numpy(),
-    #         average="macro"
-    #     )
-    # else:
-    #     polarity_f1 = 0.0
 
     polarity_f1_scores = []
     for f in range(5):

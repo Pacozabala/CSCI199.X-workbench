@@ -216,7 +216,7 @@ def evaluate(model, loader, device):
             )
 
             # foundation predictions
-            found_preds = (torch.sigmoid(foundation_logits) > 0.5).cpu()
+            found_preds = (torch.sigmoid(foundation_logits) > 0.5)
 
             all_found_preds.append(found_preds)
             all_found_true.append(foundation_labels)
@@ -235,7 +235,7 @@ def evaluate(model, loader, device):
         average="macro"
     )
 
-    # calculate polarity f1 if one exists
+    # calculate polarity f1 if foundation detected
     if len(torch.cat(all_pol_true)) > 0:
         polarity_f1 = f1_score(
             torch.cat(all_pol_true).numpy(),

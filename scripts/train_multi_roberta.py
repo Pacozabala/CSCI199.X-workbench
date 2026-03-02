@@ -9,11 +9,21 @@ from transformers import RobertaTokenizer, RobertaModel
 from torch.optim import AdamW
 from sklearn.metrics import f1_score
 
-FOUNDATIONS = ["authority","fairness","harm","ingroup","purity"]
+FOUNDATIONS = ["authority", "fairness", "harm", "ingroup", "purity"]
 
 # =========================
-# ARGUMENTS
+# ARG PARSER
 # =========================
+'''
+Parses CL args.
+--data_dir: input directory
+--output_dir: output directory
+--epochs: number of training epochs
+--batch_size: number of data entries processed at once.
+--lr: learning rate.
+--max_len: maximum length of input document.
+--lambda_weight: lambda weight passed to the model.
+'''
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -30,7 +40,6 @@ def parse_args():
     parser.add_argument("--lambda_weight", type=float, default=1.0)
 
     return parser.parse_args()
-
 
 # =========================
 # DATASET
@@ -53,7 +62,7 @@ class HierarchicalDataset(Dataset):
 
     def __len__(self):
         return len(self.texts)
-
+    
     def __getitem__(self, idx):
         encoding = self.tokenizer(
             self.texts[idx],
@@ -69,11 +78,14 @@ class HierarchicalDataset(Dataset):
             "foundation_labels": self.foundation_labels[idx],
             "polarity_labels": self.polarity_labels[idx]
         }
-
-
+    
 # =========================
 # MODEL
 # =========================
+'''
+Defines the Hierarchical Model, which inherits nn.Module
+- forward() function: used in training, returns loss and logits.
+''' 
 class HierarchicalRoBERTa(nn.Module):
     def __init__(self, lambda_weight=1.0):
         super().__init__()
@@ -96,23 +108,26 @@ class HierarchicalRoBERTa(nn.Module):
     def forward(self, input_ids, attention_mask,
                 foundation_labels=None,
                 polarity_labels=None):
-
+        
         outputs = self.encoder(
             input_ids=input_ids,
             attention_mask=attention_mask
         )
 
-        pooled = outputs.last_hidden_state[:, 0]
+        # get the 1st (CLS) token
+        pooled = outputs.last_hidden_state[:,0]
 
+        # flatten all found. logits into one array
         foundation_logits = torch.cat(
             [head(pooled) for head in self.foundation_heads],
             dim=1
         )
 
+
         polarity_logits = torch.stack(
             [head(pooled) for head in self.polarity_heads],
             dim=1
-        )  # [batch, 5, 3]
+        ) # constructs the 3D array with size: [batch, 5, 3] -> batch entries, 5 triples per entry
 
         loss = None
 
@@ -130,18 +145,21 @@ class HierarchicalRoBERTa(nn.Module):
                     polarity_logits[:, f, :],
                     polarity_labels[:, f]
                 )
-
+                
                 masked_loss = (ce_loss * mask).sum() / (mask.sum() + 1e-8)
                 polarity_loss += masked_loss
-
-            loss = foundation_loss + self.lambda_weight * polarity_loss
+            
+            # masked overall loss
+            loss = foundation_loss + (self.lambda_weight* polarity_loss)
 
         return loss, foundation_logits, polarity_logits
-
-
+    
 # =========================
-# TRAIN
+# TRAINING FUNCTION
 # =========================
+'''
+Trains the model for 1 epoch.
+'''
 def train_epoch(model, loader, optimizer, device):
     model.train()
     total_loss = 0
@@ -152,8 +170,10 @@ def train_epoch(model, loader, optimizer, device):
         foundation_labels = batch["foundation_labels"].to(device)
         polarity_labels = batch["polarity_labels"].to(device)
 
+        # gets rid of gradient from previous pass
         optimizer.zero_grad()
 
+        # this calls forward()
         loss, _, _ = model(
             input_ids,
             attention_mask,
@@ -161,6 +181,7 @@ def train_epoch(model, loader, optimizer, device):
             polarity_labels
         )
 
+        # backpropagate the loss
         loss.backward()
         optimizer.step()
 
@@ -168,10 +189,12 @@ def train_epoch(model, loader, optimizer, device):
 
     return total_loss / len(loader)
 
-
 # =========================
 # EVALUATION
 # =========================
+'''
+Evaluates the model.
+'''
 def evaluate(model, loader, device):
     model.eval()
 
@@ -185,33 +208,34 @@ def evaluate(model, loader, device):
         for batch in loader:
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
-            foundation_labels = batch["foundation_labels"]
-            polarity_labels = batch["polarity_labels"]
+            foundation_labels = batch["foundation_labels"].to(device)
+            polarity_labels = batch["polarity_labels"].to(device)
 
             _, foundation_logits, polarity_logits = model(
                 input_ids, attention_mask
             )
 
-            # Foundation predictions
+            # foundation predictions
             found_preds = (torch.sigmoid(foundation_logits) > 0.5).cpu()
 
             all_found_preds.append(found_preds)
             all_found_true.append(foundation_labels)
 
-            # Polarity predictions (masked)
+            # polarity predictions (masked)
             pol_preds = torch.argmax(polarity_logits, dim=2).cpu()
 
             mask = foundation_labels == 1
 
             all_pol_preds.append(pol_preds[mask])
             all_pol_true.append(polarity_labels[mask])
-
+        
     foundation_f1 = f1_score(
         torch.cat(all_found_true).numpy().flatten(),
         torch.cat(all_found_preds).numpy().flatten(),
         average="macro"
     )
 
+    # calculate polarity f1 if one exists
     if len(torch.cat(all_pol_true)) > 0:
         polarity_f1 = f1_score(
             torch.cat(all_pol_true).numpy(),
@@ -223,10 +247,16 @@ def evaluate(model, loader, device):
 
     return foundation_f1, polarity_f1
 
-
 # =========================
 # MAIN
 # =========================
+'''
+Main method
+- loads the datasets, tokenizer, optimizer
+- frames CSVs as HierarchicalDataset(s)
+- uses data loaders to pass HDs in batches to training and evaluation functions
+- trains model for specified number of epochs
+'''
 def main():
     args = parse_args()
 

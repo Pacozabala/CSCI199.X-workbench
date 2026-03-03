@@ -5,7 +5,7 @@ import torch.nn as nn
 import pandas as pd
 import numpy as np
 import time
-from tqdm.auto import tqdm 
+from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from transformers import RobertaTokenizer, RobertaModel
 from torch.optim import AdamW
@@ -168,13 +168,13 @@ def train_epoch(model, loader, optimizer, device, epoch):
 
     start_time = time.time()
 
-    progress_bar = tqdm(
+    loader_progress = tqdm(
         loader,
         desc=f"Epoch {epoch+1}",
         leave=False
     )
 
-    for batch in progress_bar:
+    for batch in loader_progress:
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
         foundation_labels = batch["foundation_labels"].to(device)
@@ -194,7 +194,7 @@ def train_epoch(model, loader, optimizer, device, epoch):
 
         total_loss += loss.item()
 
-        progress_bar.set_postfix(loss=loss.item())
+        loader_progress.set_postfix(loss=loss.item())
 
     epoch_time = time.time() - start_time
     avg_loss = total_loss / len(loader)

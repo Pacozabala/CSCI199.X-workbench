@@ -206,6 +206,7 @@ def train_epoch(model, loader, optimizer, device, epoch):
 # =========================
 '''
 Evaluates the model.
+Returns foundation f1, polarity f1 per foundation, and mean polarity f1
 '''
 def evaluate(model, loader, device):
     model.eval()
@@ -213,8 +214,8 @@ def evaluate(model, loader, device):
     all_found_preds = []
     all_found_true = []
 
-    all_pol_preds = []
-    all_pol_true = []
+    all_pol_preds = [[] for _ in range(5)]
+    all_pol_true = [[] for _ in range(5)]
 
     with torch.no_grad():
         for batch in loader:
@@ -228,17 +229,23 @@ def evaluate(model, loader, device):
             )
 
             # foundation predictions
-            found_preds = (torch.sigmoid(foundation_logits) > 0.5).cpu()
+            found_preds = (torch.sigmoid(foundation_logits) > 0.5)
 
-            all_found_preds.append(found_preds)
-            all_found_true.append(foundation_labels)
+            all_found_preds.append(found_preds.cpu())
+            all_found_true.append(foundation_labels.cpu())
 
             # polarity predictions (masked)
-            pol_preds = torch.argmax(polarity_logits, dim=2).cpu()
-            mask = (foundation_labels == 1).cpu()
+            pol_preds = torch.argmax(polarity_logits, dim=2)
 
-            all_pol_preds.append(pol_preds[mask])
-            all_pol_true.append(polarity_labels[mask].cpu())    
+            for f in range(5):
+                mask_f = found_preds[:, f] == 1 # predicted foundations mask
+
+                if mask_f.sum() > 0:
+                    preds_f = pol_preds[mask_f, f]
+                    true_f = polarity_labels[mask_f, f]
+
+                    all_pol_preds[f].append(preds_f.cpu())
+                    all_pol_true[f].append(true_f.cpu())
         
     foundation_f1 = f1_score(
         torch.cat([t.cpu() for t in all_found_true]).numpy().flatten(),
@@ -246,17 +253,20 @@ def evaluate(model, loader, device):
         average="macro"
     )
 
-    # calculate polarity f1 if one exists
-    if len(all_pol_true) > 0:
-        polarity_f1 = f1_score(
-            torch.cat([t.cpu() for t in all_pol_true]).numpy(),
-            torch.cat([t.cpu() for t in all_pol_preds]).numpy(),
-            average="macro"
-        )
-    else:
-        polarity_f1 = 0.0
+    polarity_f1_scores = []
+    for f in range(5):
+        if len(all_pol_true[f]) > 0:
+            y_true = torch.cat(all_pol_true[f]).numpy()
+            y_pred = torch.cat(all_pol_preds[f]).numpy()
 
-    return foundation_f1, polarity_f1
+            f1 = f1_score(y_true, y_pred, average="macro")
+            polarity_f1_scores.append(f1)
+        else:
+            polarity_f1_scores.append(0.0)
+    
+    mean_polarity_f1 = sum(polarity_f1_scores) / 5
+
+    return foundation_f1, polarity_f1_scores, mean_polarity_f1
 
 # =========================
 # MAIN
@@ -301,15 +311,15 @@ def main():
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
     for epoch in range(args.epochs):
-        train_loss, epoch_time = train_epoch(
-            model, train_loader, optimizer, device, epoch
-        )
-        foundation_f1, polarity_f1 = evaluate(model, val_loader, device)
+        train_loss, epoch_time = train_epoch(model, train_loader, optimizer, device, epoch)
+        foundation_f1, polarity_f1_set, mean_polarity_f1 = evaluate(model, val_loader, device)
 
         print(f"\nEpoch {epoch+1}")
         print(f"Train Loss: {train_loss:.4f}")
         print(f"Foundation Macro F1: {foundation_f1:.4f}")
-        print(f"Polarity Macro F1 (masked): {polarity_f1:.4f}")
+        for f in range(5):
+            print(f"{FOUNDATIONS[f]} Polarity Macro F1 (masked): {polarity_f1_set[f]:.4f}")
+        print(f"Mean Polarity Macro F1 (masked): {mean_polarity_f1:.4f}")
         print(f"Epoch Time: {epoch_time:.2f}s")
 
     os.makedirs(args.output_dir, exist_ok=True)

@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import pandas as pd
 import numpy as np
+import time
+from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from transformers import RobertaTokenizer, RobertaModel
 from torch.optim import AdamW
@@ -160,9 +162,17 @@ class HierarchicalRoBERTa(nn.Module):
 '''
 Trains the model for 1 epoch.
 '''
-def train_epoch(model, loader, optimizer, device):
+def train_epoch(model, loader, optimizer, device, epoch):
     model.train()
     total_loss = 0
+
+    start_time = time.time()
+
+    loader_progress = tqdm(
+        loader,
+        desc=f"Epoch {epoch+1}",
+        leave=False
+    )
 
     for batch in loader:
         input_ids = batch["input_ids"].to(device)
@@ -187,7 +197,12 @@ def train_epoch(model, loader, optimizer, device):
 
         total_loss += loss.item()
 
-    return total_loss / len(loader)
+        loader_progress.set_postfix(loss=loss.item())
+
+    epoch_time = time.time() - start_time
+    avg_loss = total_loss / len(loader)
+
+    return avg_loss, epoch_time
 
 # =========================
 # EVALUATION
@@ -299,7 +314,7 @@ def main():
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
     for epoch in range(args.epochs):
-        train_loss = train_epoch(model, train_loader, optimizer, device)
+        train_loss, epoch_time = train_epoch(model, train_loader, optimizer, device, epoch)
         foundation_f1, polarity_f1_set, mean_polarity_f1 = evaluate(model, val_loader, device)
 
         print(f"\nEpoch {epoch+1}")
@@ -308,6 +323,7 @@ def main():
         for f in range(5):
             print(f"{FOUNDATIONS[f]} Polarity Macro F1 (masked): {polarity_f1_set[f]:.4f}")
         print(f"Mean Polarity Macro F1 (masked): {mean_polarity_f1:.4f}")
+        print(f"Epoch Time: {epoch_time:.2f}s")
 
     os.makedirs(args.output_dir, exist_ok=True)
     torch.save(model.state_dict(),

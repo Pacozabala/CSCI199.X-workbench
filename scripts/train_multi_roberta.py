@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import pandas as pd
 import numpy as np
+import time
+from tqdm.auto import tqdm 
 from torch.utils.data import Dataset, DataLoader
 from transformers import RobertaTokenizer, RobertaModel
 from torch.optim import AdamW
@@ -160,20 +162,26 @@ class HierarchicalRoBERTa(nn.Module):
 '''
 Trains the model for 1 epoch.
 '''
-def train_epoch(model, loader, optimizer, device):
+def train_epoch(model, loader, optimizer, device, epoch):
     model.train()
     total_loss = 0
 
-    for batch in loader:
+    start_time = time.time()
+
+    progress_bar = tqdm(
+        loader,
+        desc=f"Epoch {epoch+1}",
+        leave=False
+    )
+
+    for batch in progress_bar:
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
         foundation_labels = batch["foundation_labels"].to(device)
         polarity_labels = batch["polarity_labels"].to(device)
 
-        # gets rid of gradient from previous pass
         optimizer.zero_grad()
 
-        # this calls forward()
         loss, _, _ = model(
             input_ids,
             attention_mask,
@@ -181,13 +189,17 @@ def train_epoch(model, loader, optimizer, device):
             polarity_labels
         )
 
-        # backpropagate the loss
         loss.backward()
         optimizer.step()
 
         total_loss += loss.item()
 
-    return total_loss / len(loader)
+        progress_bar.set_postfix(loss=loss.item())
+
+    epoch_time = time.time() - start_time
+    avg_loss = total_loss / len(loader)
+
+    return avg_loss, epoch_time
 
 # =========================
 # EVALUATION
@@ -223,23 +235,22 @@ def evaluate(model, loader, device):
 
             # polarity predictions (masked)
             pol_preds = torch.argmax(polarity_logits, dim=2).cpu()
-
-            mask = foundation_labels == 1
+            mask = (foundation_labels == 1).cpu()
 
             all_pol_preds.append(pol_preds[mask])
-            all_pol_true.append(polarity_labels[mask])
+            all_pol_true.append(polarity_labels[mask].cpu())    
         
     foundation_f1 = f1_score(
-        torch.cat(all_found_true).numpy().flatten(),
-        torch.cat(all_found_preds).numpy().flatten(),
+        torch.cat([t.cpu() for t in all_found_true]).numpy().flatten(),
+        torch.cat([t.cpu() for t in all_found_preds]).numpy().flatten(),
         average="macro"
     )
 
     # calculate polarity f1 if one exists
-    if len(torch.cat(all_pol_true)) > 0:
+    if len(all_pol_true) > 0:
         polarity_f1 = f1_score(
-            torch.cat(all_pol_true).numpy(),
-            torch.cat(all_pol_preds).numpy(),
+            torch.cat([t.cpu() for t in all_pol_true]).numpy(),
+            torch.cat([t.cpu() for t in all_pol_preds]).numpy(),
             average="macro"
         )
     else:
@@ -290,13 +301,16 @@ def main():
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
     for epoch in range(args.epochs):
-        train_loss = train_epoch(model, train_loader, optimizer, device)
+        train_loss, epoch_time = train_epoch(
+            model, train_loader, optimizer, device, epoch
+        )
         foundation_f1, polarity_f1 = evaluate(model, val_loader, device)
 
         print(f"\nEpoch {epoch+1}")
         print(f"Train Loss: {train_loss:.4f}")
         print(f"Foundation Macro F1: {foundation_f1:.4f}")
         print(f"Polarity Macro F1 (masked): {polarity_f1:.4f}")
+        print(f"Epoch Time: {epoch_time:.2f}s")
 
     os.makedirs(args.output_dir, exist_ok=True)
     torch.save(model.state_dict(),

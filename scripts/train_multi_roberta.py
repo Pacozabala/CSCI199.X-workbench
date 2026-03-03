@@ -174,7 +174,7 @@ def train_epoch(model, loader, optimizer, device, epoch):
         leave=False
     )
 
-    for batch in loader:
+    for batch in loader_progress:
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
         foundation_labels = batch["foundation_labels"].to(device)

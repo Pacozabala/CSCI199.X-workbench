@@ -28,15 +28,15 @@ def parse_args():
     parser.add_argument(
         "--emfd",
         type=str,
-        default="data/lexicons/eMFD_worldist.csv",
+        default="data/lexicons/eMFD_wordlist.csv",
         help="Path to eMFD csv"
     )
 
     parser.add_argument(
         "--output",
         type=str,
-        default="data/lexicons/combined_lexcion.csv",
-        help="Output path for combined lexicon CSV"
+        default="data/lexicons",
+        help="Output folder for combined lexicon CSV"
     )
 
     parser.add_argument(
@@ -69,34 +69,41 @@ def normalize_foundation(label):
         "purity": "purity"
     }
 
-    return foundation_map[label]
+    return foundation_map.get(label.lower(), label.lower())
 
 # =========================
 # LOAD FILES
 # =========================
 def load_mfd(path):
     df = pd.read_csv(path)
-    df["category"] = df["category"].apply(normalize_foundation, axis=1)
+    df["word"] = df["word"].str.lower()
+    df["category"] = df["category"].apply(normalize_foundation)
     df["source"] = "mfd"
 
     return df
 
 def load_mfd2(path):
     label_dict = {}
-    rows = [("word", "category", "sentiment", "source")]
-    mode = "categories"
+    rows = []
+    
+    # to delimit the section of the file, separated by "%"
+    section = 0
 
     with open(path, 'r') as f:
         for line in f:
             line = line.strip()
 
-            if line ==  "%":
-                if mode == "categories":
-                    mode = "words"
-                    continue
+            if not line:
+                continue
 
-            if mode == "categories":
+            if line ==  "%":
+                section += 1
+                continue
+
+            if section == 1:
                 parts = line.split()
+                if len(parts) < 2:
+                    continue
 
                 cat_id = parts[0]
                 label = parts[1]
@@ -107,26 +114,33 @@ def load_mfd2(path):
 
                 label_dict[cat_id] = foundation, polarity
 
-            if mode == "words":
+            elif section == 2:
                 parts = line.split()
+
+                if len(parts) < 2:
+                    continue
 
                 word = parts[0]
                 cat_ids = parts[1:]
 
-                for id in cat_ids:
-                    foundation, polarity = label_dict[id]
-                    rows.append((word, foundation, polarity, "mfd2"))
+                for cid in cat_ids:
+                    foundation, polarity = label_dict[cid]
+                    rows.append((word.lower(), foundation, polarity, "mfd2"))
+
+    return pd.DataFrame(rows, columns=["word", "foundation", "polarity", "source"])
 
 def load_emfd(path, threshold):
     emfd = pd.read_csv(path)
-    emfd_fixed = [("word", "category", "sentiment", "source")]
+    emfd_fixed = []
 
     for _, row in emfd.iterrows():
         for f in ["care", "fairness", "loyalty", "authority", "sanctity"]:
-            if row[f"{f}_p"] >= threshold:
+            found_col = f"{f}_p"
+            pol_col = f"{f}_sent"
+            if row[found_col] >= threshold:
                 normal_label = normalize_foundation(f)
                 
-                if row[f"{f}_sent"] >= 0:
+                if row[pol_col] >= 0:
                     sentiment_label = "virtue"
                 else:
                     sentiment_label = "vice"
@@ -134,7 +148,7 @@ def load_emfd(path, threshold):
                 emfd_fixed.append((row["word"].lower(), normal_label, sentiment_label, "emfd"))
                 
 
-    return pd.DataFrame(emfd_fixed)
+    return pd.DataFrame(emfd_fixed, columns=["word", "foundation", "polarity", "source"])
 
 # =========================
 # MAIN METHOD
@@ -150,6 +164,19 @@ def main():
 
     os.makedirs(args.output, exist_ok=True)
 
-    mfd = pd.read_csv(os.path.join(args.input, "MFD_original.csv"))
-    mfd_2 = pd.read_csv(os.path.join(args.input, "mfd2.0.csv"))
-    emfd = pd.read_csv(os.path.join(args.input, "eMFD_wordlist.csv"))
+    print("Loading MFD...")
+    mfd = load_mfd(args.mfd)
+
+    print("Loading MFD 2.0...")
+    threshold = float(args.threshold)
+    mfd2 = load_mfd2(args.mfd2, threshold)
+
+    print("Loading eMFD...")
+    emfd = load_emfd(args.emfd)
+
+    combined_lexicon = pd.concat([mfd, mfd2, emfd], axis=0, ignore_index=True)
+    combined_lexicon.drop_duplicates(inplace=True)
+
+    combined_lexicon.to_csv(os.path.join(args.output, "combined_lexicon.csv"), index=False)
+
+    print("Saved combined lexicons.")

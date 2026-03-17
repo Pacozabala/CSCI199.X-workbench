@@ -61,14 +61,80 @@ def normalize_foundation(label):
         "cheating": "fairness",
         "loyalty": "ingroup",
         "betrayal": "ingroup",
+        "ingroup": "ingroup",
         "authority": "authority",
         "subversion": "authority",
         "sanctity": "purity",
-        "degradation": "purity"
+        "degradation": "purity",
+        "purity": "purity"
     }
 
     return foundation_map[label]
 
+# =========================
+# LOAD FILES
+# =========================
+def load_mfd(path):
+    df = pd.read_csv(path)
+    df["category"] = df["category"].apply(normalize_foundation, axis=1)
+    df["source"] = "mfd"
+
+    return df
+
+def load_mfd2(path):
+    label_dict = {}
+    rows = [("word", "category", "sentiment", "source")]
+    mode = "categories"
+
+    with open(path, 'r') as f:
+        for line in f:
+            line = line.strip()
+
+            if line ==  "%":
+                if mode == "categories":
+                    mode = "words"
+                    continue
+
+            if mode == "categories":
+                parts = line.split()
+
+                cat_id = parts[0]
+                label = parts[1]
+
+                foundation, polarity = label.split(".")
+
+                foundation = normalize_foundation(foundation)
+
+                label_dict[cat_id] = foundation, polarity
+
+            if mode == "words":
+                parts = line.split()
+
+                word = parts[0]
+                cat_ids = parts[1:]
+
+                for id in cat_ids:
+                    foundation, polarity = label_dict[id]
+                    rows.append((word, foundation, polarity, "mfd2"))
+
+def load_emfd(path, threshold):
+    emfd = pd.read_csv(path)
+    emfd_fixed = [("word", "category", "sentiment", "source")]
+
+    for _, row in emfd.iterrows():
+        for f in ["care", "fairness", "loyalty", "authority", "sanctity"]:
+            if row[f"{f}_p"] >= threshold:
+                normal_label = normalize_foundation(f)
+                
+                if row[f"{f}_sent"] >= 0:
+                    sentiment_label = "virtue"
+                else:
+                    sentiment_label = "vice"
+
+                emfd_fixed.append((row["word"].lower(), normal_label, sentiment_label, "emfd"))
+                
+
+    return pd.DataFrame(emfd_fixed)
 
 # =========================
 # MAIN METHOD

@@ -127,7 +127,7 @@ def load_mfd2(path):
                     foundation, polarity = label_dict[cid]
                     rows.append((word.lower(), foundation, polarity, "mfd2"))
 
-    return pd.DataFrame(rows, columns=["word", "foundation", "polarity", "source"])
+    return pd.DataFrame(rows, columns=["word", "category", "sentiment", "source"])
 
 def load_emfd(path, threshold):
     emfd = pd.read_csv(path)
@@ -148,7 +148,7 @@ def load_emfd(path, threshold):
                 emfd_fixed.append((row["word"].lower(), normal_label, sentiment_label, "emfd"))
                 
 
-    return pd.DataFrame(emfd_fixed, columns=["word", "foundation", "polarity", "source"])
+    return pd.DataFrame(emfd_fixed, columns=["word", "category", "sentiment", "source"])
 
 # =========================
 # MAIN METHOD

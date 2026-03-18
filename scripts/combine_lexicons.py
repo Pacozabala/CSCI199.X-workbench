@@ -115,13 +115,13 @@ def load_mfd2(path):
                 label_dict[cat_id] = foundation, polarity
 
             elif section == 2:
-                parts = line.split()
+                parts = line.rsplit(maxsplit=1)
 
                 if len(parts) < 2:
                     continue
 
                 word = parts[0]
-                cat_ids = parts[1:]
+                cat_ids = parts[1].split()
 
                 for cid in cat_ids:
                     foundation, polarity = label_dict[cid]

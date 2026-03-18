@@ -180,3 +180,6 @@ def main():
     combined_lexicon.to_csv(os.path.join(args.output, "combined_lexicon.csv"), index=False)
 
     print("Saved combined lexicons.")
+
+if __name__ == "__main__":
+    main()

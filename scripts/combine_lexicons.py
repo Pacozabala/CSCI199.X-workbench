@@ -168,11 +168,11 @@ def main():
     mfd = load_mfd(args.mfd)
 
     print("Loading MFD 2.0...")
-    threshold = float(args.threshold)
-    mfd2 = load_mfd2(args.mfd2, threshold)
+    mfd2 = load_mfd2(args.mfd2)
 
     print("Loading eMFD...")
-    emfd = load_emfd(args.emfd)
+    threshold = float(args.threshold)
+    emfd = load_emfd(args.emfd, threshold)
 
     combined_lexicon = pd.concat([mfd, mfd2, emfd], axis=0, ignore_index=True)
     combined_lexicon.drop_duplicates(inplace=True)

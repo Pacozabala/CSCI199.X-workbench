@@ -20,7 +20,7 @@ import argparse
 import pandas as pd
 
 DEFAULT_DATA_DIR = "data"
-DEFAULT_MFD = os.path.join(DEFAULT_DATA_DIR, "lexicons/MFD_original.csv")
+DEFAULT_MFD = os.path.join(DEFAULT_DATA_DIR, "lexicons/combined_lexicon.csv")
 DEFAULT_MFRC = os.path.join(DEFAULT_DATA_DIR, "final_mfrc_data.csv")
 
 

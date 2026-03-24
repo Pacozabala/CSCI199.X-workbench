@@ -8,11 +8,11 @@ Default input directory: data/
 Example usage:
 
 python bow_polarity_label.py \
+    --input_path data/final_mfrc_data.csv \
     --output_path data/MFRC_polarity.csv \
     --use_lemma \
     --use_frequency \
-    --tie_break drop \
-    --drop_zero_signal
+    --tie_break drop
 """
 
 import os
@@ -118,7 +118,9 @@ def main():
 
     print("Loading MFD...")
     MFD = pd.read_csv(DEFAULT_MFD)
-    print("Loading MFRC...")
+
+    input_path = args.input_path if args.input_path else DEFAULT_MFRC
+    print(f"Loading MFRC from {input_path}")
     MFRC = pd.read_csv(DEFAULT_MFRC)
 
     # normalize foundations

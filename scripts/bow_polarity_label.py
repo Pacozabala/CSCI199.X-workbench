@@ -7,7 +7,7 @@ Default input directory: data/
 
 Example usage:
 
-python bow_polarity_label.py \
+python scripts/bow_polarity_label.py \
     --input_path data/final_mfrc_data.csv \
     --output_path data/MFRC_polarity.csv \
     --use_lemma \

@@ -33,6 +33,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--input_path",
+        type=str,
+        default="data/final_mfrc_data.csv",
+        help="Path to unlabeled dataset CSV"
+    )
+
+    parser.add_argument(
         "--output_path",
         type=str,
         default="data/MFRC_polarity.csv",

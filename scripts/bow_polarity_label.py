@@ -9,7 +9,7 @@ Example usage:
 
 python scripts/bow_polarity_label.py \
     --input_path data/final_mfrc_data.csv \
-    --output_path data/MFRC_polarity.csv \
+    --output_path data/MFRC_multi.csv \
     --use_lemma \
     --use_frequency \
     --tie_break drop

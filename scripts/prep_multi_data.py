@@ -7,7 +7,7 @@ python scripts/prep_multi_data.py
 import pandas as pd
 import os
 import argparse
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 
 FOUNDATIONS = ["authority", "fairness", "harm", "ingroup", "purity"]
 
@@ -100,31 +100,13 @@ def main():
         ]["text"].unique()
         multi_df.loc[multi_df["text"].isin(vice_texts), f"{f}_pol"] = 1
 
-    # 4. Train/Val/Test Split
-    train_df, temp_df = train_test_split(
-        multi_df,
-        test_size=args.test_size,
-        random_state=args.seed,
-    )
-
-    val_df, test_df = train_test_split(
-        temp_df,
-        test_size=0.5,
-        random_state=args.seed,
-    )
-
-    print(f"Train size: {len(train_df)}")
-    print(f"Val size: {len(val_df)}")
-    print(f"Test size: {len(test_df)}")
-
-    # 5. Save unified splits
-    train_df.to_csv(os.path.join(args.output, "train.csv"), index=False)
-    val_df.to_csv(os.path.join(args.output, "val.csv"), index=False)
-    test_df.to_csv(os.path.join(args.output, "test.csv"), index=False)
+    # 5. save full dataset (for k-fold)
+    output_path = os.path.join(args.output, "multi_label.csv")
+    multi_df.to_csv(output_path, index=False)
 
     print("Saved hierarchical dataset.")
-    print("Columns:")
-    print(train_df.columns.tolist())
+    print("Shape:", multi_df.shape)
+    print("Columns:", multi_df.columns.tolist())
 
 
 if __name__ == "__main__":

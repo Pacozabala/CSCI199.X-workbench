@@ -6,9 +6,9 @@ from torch.utils.data import DataLoader
 from transformers import RobertaTokenizer
 from torch.optim import AdamW
 
-from nn_dataset import HierarchicalDataset
-from nn_model import HierarchicalRoBERTa
-from nn_trainer import train_epoch, evaluate
+from h_dataset import HierarchicalDataset
+from h_model import HierarchicalRoBERTa
+from h_trainer import train_epoch, evaluate
 
 FOUNDATIONS = ["authority", "fairness", "harm", "ingroup", "purity"]
 

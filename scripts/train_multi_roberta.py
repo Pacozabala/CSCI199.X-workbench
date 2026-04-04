@@ -1,10 +1,12 @@
 import os
 import argparse
 import torch
+import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader
 from transformers import RobertaTokenizer
 from torch.optim import AdamW
+from sklearn.model_selection import KFold
 
 from h_dataset import HierarchicalDataset
 from h_model import HierarchicalRoBERTa
@@ -58,50 +60,76 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    train_df = pd.read_csv(os.path.join(args.data_dir, "train.csv"))
-    val_df = pd.read_csv(os.path.join(args.data_dir, "val.csv"))
+    df = pd.read_csv(os.path.join(args.data_dir, "multi_label.csv"))
 
     for col in FOUNDATIONS:
-        train_df[col] = train_df[col].astype(int)
-        val_df[col] = val_df[col].astype(int)
+        df[col] = df[col].astype(int)
     for col in [f"{f}_pol" for f in FOUNDATIONS]:
-        train_df[col] = train_df[col].astype(int)
-        val_df[col] = val_df[col].astype(int)
+        df[col] = df[col].astype(int)
+
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
     tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
-    train_dataset = HierarchicalDataset(train_df, tokenizer, args.max_len)
-    val_dataset = HierarchicalDataset(val_df, tokenizer, args.max_len)
+    fold_results = []
 
-    train_loader = DataLoader(train_dataset,
-                              batch_size=args.batch_size,
-                              shuffle=True)
+    for fold, (train_idx, val_idx) in enumerate(kf.split(df)):
 
-    val_loader = DataLoader(val_dataset,
-                            batch_size=args.batch_size)
+        print(f"\n==============================")
+        print(f"FOLD {fold+1}")
+        print(f"==============================")
 
-    model = HierarchicalRoBERTa(lambda_weight=args.lambda_weight)
-    model.to(device)
+        train_df = df.iloc[train_idx].reset_index(drop=True)
+        val_df = df.iloc[val_idx].reset_index(drop=True)
 
-    optimizer = AdamW(model.parameters(), lr=args.lr)
+        train_dataset = HierarchicalDataset(train_df, tokenizer, args.max_len)
+        val_dataset = HierarchicalDataset(val_df, tokenizer, args.max_len)
 
-    for epoch in range(args.epochs):
-        train_loss, epoch_time = train_epoch(model, train_loader, optimizer, device, epoch)
-        foundation_f1, polarity_f1_set, mean_polarity_f1 = evaluate(model, val_loader, device)
+        train_loader = DataLoader(train_dataset,
+                                batch_size=args.batch_size,
+                                shuffle=True)
 
-        print(f"\nEpoch {epoch+1}")
-        print(f"Train Loss: {train_loss:.4f}")
-        print(f"Foundation Macro F1: {foundation_f1:.4f}")
-        for f in range(5):
-            print(f"{FOUNDATIONS[f]} Polarity Macro F1 (masked): {polarity_f1_set[f]:.4f}")
-        print(f"Mean Polarity Macro F1 (masked): {mean_polarity_f1:.4f}")
-        print(f"Epoch Time: {epoch_time:.2f}s")
+        val_loader = DataLoader(val_dataset,
+                                batch_size=args.batch_size)
 
-    os.makedirs(args.output_dir, exist_ok=True)
-    torch.save(model.state_dict(),
-               os.path.join(args.output_dir, "hierarchical_model.pt"))
+        # IMPORTANT: reset model per fold
+        model = HierarchicalRoBERTa(lambda_weight=args.lambda_weight)
+        model.to(device)
 
-    print("\nModel saved.")
+        optimizer = AdamW(model.parameters(), lr=args.lr)
+
+        for epoch in range(args.epochs):
+            train_loss, epoch_time = train_epoch(model, train_loader, optimizer, device, epoch)
+            foundation_f1, polarity_f1_set, mean_polarity_f1 = evaluate(model, val_loader, device)
+
+            print(f"\nEpoch {epoch+1}")
+            print(f"Train Loss: {train_loss:.4f}")
+            print(f"Foundation Macro F1: {foundation_f1:.4f}")
+            # for f in range(5):
+            #     print(f"{FOUNDATIONS[f]} Polarity Macro F1 (masked): {polarity_f1_set[f]:.4f}")
+            print(f"Mean Polarity Macro F1: {mean_polarity_f1:.4f}")
+            print(f"Epoch Time: {epoch_time:.2f}s")
+
+        fold_results.append((foundation_f1, mean_polarity_f1))
+
+    foundation_scores = [x[0] for x in fold_results]
+    polarity_scores = [x[1] for x in fold_results]
+
+    print(f"\n==============================")
+    print(f"FOLD {fold+1}")
+    print(f"==============================")
+
+    print("Foundation F1 per fold: ", foundation_scores)
+    print("Mean Foundation F1: ", np.mean(foundation_scores))
+
+
+    print("Polarity F1 per fold: ", polarity_scores)
+    print("Mean Polarity F1: ", np.mean(polarity_scores))
+    # os.makedirs(args.output_dir, exist_ok=True)
+    # torch.save(model.state_dict(),
+    #            os.path.join(args.output_dir, "hierarchical_model.pt"))
+
+    # print("\nModel saved.")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ The following installs the needed python modules, as well as the specific model 
 pip install -r requirements.txt
 pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl
 ```
-
+### Independent Classifier (obsolete)
 `bow_polarity_label.py` assigns polarity labels to the MFRC, using the rules declared in the args above. I find that these settings balance the dataset most effectively.
 ```[bash]
 python scripts/bow_polarity_label.py \
@@ -31,3 +31,5 @@ python scripts/prep_binary_data.py --input "data/MFRC_polarity.csv"
 ```[bash]
 python scripts/train_roberta.py --foundation authority --pole vice
 ```
+
+### Hierarchical Classifier Process

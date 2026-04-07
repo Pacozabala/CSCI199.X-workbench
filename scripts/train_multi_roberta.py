@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader
-from transformers import RobertaTokenizer
+from transformers import RobertaTokenizerFast
 from torch.optim import AdamW
 from sklearn.model_selection import KFold
 
@@ -71,7 +71,15 @@ def main():
     # k-fold function
     kf = KFold(n_splits=5, shuffle=True)
 
-    tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
+
+    encodings = tokenizer(
+        df["text"].tolist(),
+        padding="max_length",
+        truncation=True,
+        max_length=args.max_len,
+        return_tensors="pt"
+    )
 
     fold_results = []
 
@@ -85,16 +93,30 @@ def main():
         train_df = df.iloc[train_idx].reset_index(drop=True)
         val_df = df.iloc[val_idx].reset_index(drop=True)
 
+        train_encodings = {
+            "input_ids": encodings["input_ids"][train_idx],
+            "attention_mask": encodings["attention_mask"][train_idx]
+        }
+
+        val_encodings = {
+            "input_ids": encodings["input_ids"][val_idx],
+            "attention_mask": encodings["attention_mask"][val_idx]
+        }
+
         # prepare the data into dataloaders
-        train_dataset = HierarchicalDataset(train_df, tokenizer, args.max_len)
-        val_dataset = HierarchicalDataset(val_df, tokenizer, args.max_len)
+        train_dataset = HierarchicalDataset(train_df, train_encodings, args.max_len)
+        val_dataset = HierarchicalDataset(val_df, val_encodings, args.max_len)
 
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,
-                                shuffle=True)
+                                shuffle=True,
+                                num_workers=2,
+                                pin_memory=True)
 
         val_loader = DataLoader(val_dataset,
-                                batch_size=args.batch_size)
+                                batch_size=args.batch_size,
+                                num_workers=2,
+                                pin_memory=True)
 
         # IMPORTANT: reset model per fold
         model = HierarchicalRoBERTa(lambda_weight=args.lambda_weight)

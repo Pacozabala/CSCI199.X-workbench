@@ -69,7 +69,7 @@ def main():
         df[col] = df[col].astype(int)
 
     # k-fold function
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    kf = KFold(n_splits=5, shuffle=True)
 
     tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 

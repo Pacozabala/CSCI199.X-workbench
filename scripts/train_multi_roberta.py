@@ -89,13 +89,9 @@ def main():
         print(f"FOLD {fold+1}")
         print(f"==============================")
 
-        # split the prepped df
-        train_df = df.iloc[train_idx]
-        val_df = df.iloc[val_idx]
-
         # prepare the data into dataloaders
-        train_dataset = HierarchicalDataset(train_df, encodings, train_idx)
-        val_dataset = HierarchicalDataset(val_df, encodings, val_idx)
+        train_dataset = HierarchicalDataset(df, encodings, train_idx)
+        val_dataset = HierarchicalDataset(df, encodings, val_idx)
 
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,

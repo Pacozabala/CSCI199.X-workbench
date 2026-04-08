@@ -1,6 +1,8 @@
 import time
 from tqdm import tqdm
 import torch
+from torch.amp.autocast_mode import autocast
+from torch.amp.grad_scaler import GradScaler
 from sklearn.metrics import f1_score
 
 # =========================
@@ -21,6 +23,8 @@ def train_epoch(model, loader, optimizer, device, epoch):
         leave=False
     )
 
+    scaler = GradScaler()
+
     for batch in loader_progress:
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
@@ -30,17 +34,22 @@ def train_epoch(model, loader, optimizer, device, epoch):
         # gets rid of gradient from previous pass
         optimizer.zero_grad()
 
-        # this calls forward()
-        loss, _, _ = model(
-            input_ids,
-            attention_mask,
-            foundation_labels,
-            polarity_labels
-        )
+        # mixed precision forward() call
+        with autocast():
+            loss, _, _ = model(
+                input_ids,
+                attention_mask,
+                foundation_labels,
+                polarity_labels
+            )
+        
 
-        # backpropagate the loss
-        loss.backward()
-        optimizer.step()
+        # backpropagate the loss using scaler and optimizer step
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+
+        # update scaler
+        scaler.update()
 
         total_loss += loss.item()
 

@@ -23,7 +23,7 @@ def train_epoch(model, loader, optimizer, device, epoch):
         leave=False
     )
 
-    scaler = GradScaler()
+    GradScaler(enabled=(device.type=="cuda"))
 
     for batch in loader_progress:
         input_ids = batch["input_ids"].to(device)
@@ -35,7 +35,7 @@ def train_epoch(model, loader, optimizer, device, epoch):
         optimizer.zero_grad()
 
         # mixed precision forward() call
-        with autocast():
+        with autocast(device_type=device.type, enabled=(device.type=="cuda")):
             loss, _, _ = model(
                 input_ids,
                 attention_mask,

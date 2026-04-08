@@ -6,7 +6,7 @@ import pandas as pd
 from torch.utils.data import DataLoader
 from transformers import RobertaTokenizer
 from torch.optim import AdamW
-from sklearn.model_selection import KFold
+from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 
 from h_dataset import HierarchicalDataset
 from h_model import HierarchicalRoBERTa
@@ -62,6 +62,8 @@ def main():
 
     df = pd.read_csv(os.path.join(args.data_dir, "multi_label.csv"))
 
+    label_matrix = df[FOUNDATIONS].values
+
     # structure the dataset with numerical labels
     for col in FOUNDATIONS:
         df[col] = df[col].astype(int)
@@ -69,7 +71,7 @@ def main():
         df[col] = df[col].astype(int)
 
     # k-fold function
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    kf = MultilabelStratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
     tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
@@ -83,7 +85,7 @@ def main():
 
     fold_results = []
 
-    for fold, (train_idx, val_idx) in enumerate(kf.split(df)):
+    for fold, (train_idx, val_idx) in enumerate(kf.split(df, label_matrix)):
 
         print(f"\n==============================")
         print(f"FOLD {fold+1}")

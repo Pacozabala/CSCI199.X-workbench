@@ -73,6 +73,14 @@ def main():
 
     tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
+    encodings = tokenizer(
+        df["text"].tolist(),
+        truncation=True,
+        padding="max_length",
+        max_length=args.max_len,
+        return_tensors="pt"
+    )
+
     fold_results = []
 
     for fold, (train_idx, val_idx) in enumerate(kf.split(df)):
@@ -86,8 +94,8 @@ def main():
         val_df = df.iloc[val_idx].reset_index(drop=True)
 
         # prepare the data into dataloaders
-        train_dataset = HierarchicalDataset(train_df, tokenizer, args.max_len)
-        val_dataset = HierarchicalDataset(val_df, tokenizer, args.max_len)
+        train_dataset = HierarchicalDataset(train_df, encodings, train_idx)
+        val_dataset = HierarchicalDataset(val_df, encodings, val_idx)
 
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,

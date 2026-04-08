@@ -7,10 +7,10 @@ FOUNDATIONS = ["authority", "fairness", "harm", "ingroup", "purity"]
 # DATASET
 # =========================
 class HierarchicalDataset(Dataset):
-    def __init__(self, df, tokenizer, max_len):
+    def __init__(self, df, encodings, indices):
         self.texts = df["text"].tolist()
-        self.tokenizer = tokenizer
-        self.max_len = max_len
+        self.encodings = encodings
+        self.indices = indices
 
         self.foundation_labels = torch.tensor(
             df[FOUNDATIONS].astype(float).values,
@@ -26,17 +26,11 @@ class HierarchicalDataset(Dataset):
         return len(self.texts)
     
     def __getitem__(self, idx):
-        encoding = self.tokenizer(
-            self.texts[idx],
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_len,
-            return_tensors="pt"
-        )
+        real_idx = self.indices[idx]
 
         return {
-            "input_ids": encoding["input_ids"].squeeze(0),
-            "attention_mask": encoding["attention_mask"].squeeze(0),
-            "foundation_labels": self.foundation_labels[idx],
-            "polarity_labels": self.polarity_labels[idx]
+            "input_ids": self.encodings["input_ids"][real_idx],
+            "attention_mask": self.encodings["attention_mask"][real_idx],
+            "foundation_labels": self.foundation_labels[real_idx],
+            "polarity_labels": self.polarity_labels[real_idx]
         }

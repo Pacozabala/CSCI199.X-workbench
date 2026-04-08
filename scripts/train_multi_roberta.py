@@ -90,8 +90,8 @@ def main():
         print(f"==============================")
 
         # split the prepped df
-        train_df = df.iloc[train_idx].reset_index(drop=True)
-        val_df = df.iloc[val_idx].reset_index(drop=True)
+        train_df = df.iloc[train_idx]
+        val_df = df.iloc[val_idx]
 
         # prepare the data into dataloaders
         train_dataset = HierarchicalDataset(train_df, encodings, train_idx)
@@ -100,12 +100,12 @@ def main():
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,
                                 shuffle=True,
-                                num_workers=4,
+                                num_workers=2,
                                 pin_memory=True)
 
         val_loader = DataLoader(val_dataset,
                                 batch_size=args.batch_size,
-                                num_workers=4,
+                                num_workers=2,
                                 pin_memory=True)
 
         # IMPORTANT: reset model per fold

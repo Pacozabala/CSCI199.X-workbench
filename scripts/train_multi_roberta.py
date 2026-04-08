@@ -62,14 +62,12 @@ def main():
 
     df = pd.read_csv(os.path.join(args.data_dir, "multi_label.csv"))
 
-    # structure the dataset with numerical labels
     for col in FOUNDATIONS:
         df[col] = df[col].astype(int)
     for col in [f"{f}_pol" for f in FOUNDATIONS]:
         df[col] = df[col].astype(int)
 
-    # k-fold function
-    kf = KFold(n_splits=5, shuffle=True)
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
     tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
 
@@ -89,7 +87,6 @@ def main():
         print(f"FOLD {fold+1}")
         print(f"==============================")
 
-        # split the prepped df
         train_df = df.iloc[train_idx].reset_index(drop=True)
         val_df = df.iloc[val_idx].reset_index(drop=True)
 
@@ -103,9 +100,8 @@ def main():
             "attention_mask": encodings["attention_mask"][val_idx]
         }
 
-        # prepare the data into dataloaders
-        train_dataset = HierarchicalDataset(train_df, train_encodings, args.max_len)
-        val_dataset = HierarchicalDataset(val_df, val_encodings, args.max_len)
+        train_dataset = HierarchicalDataset(train_df, tokenizer, args.max_len)
+        val_dataset = HierarchicalDataset(val_df, tokenizer, args.max_len)
 
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,
@@ -142,7 +138,7 @@ def main():
     polarity_scores = [x[1] for x in fold_results]
 
     print(f"\n==============================")
-    print(f"Summary of results")
+    print(f"FOLD {fold+1}")
     print(f"==============================")
 
     print("Foundation F1 per fold: ", foundation_scores)

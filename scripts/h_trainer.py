@@ -30,7 +30,7 @@ def train_epoch(model, loader, optimizer, device, epoch):
         # gets rid of gradient from previous pass
         optimizer.zero_grad()
 
-        # call forward()
+        # this calls forward()
         loss, _, _ = model(
             input_ids,
             attention_mask,
@@ -61,7 +61,6 @@ Returns foundation f1, polarity f1 per foundation, and mean polarity f1
 def evaluate(model, loader, device):
     model.eval()
 
-    # arrays to store predictions and true values
     all_found_preds = []
     all_found_true = []
 
@@ -70,30 +69,27 @@ def evaluate(model, loader, device):
 
     with torch.no_grad():
         for batch in loader:
-            # move labels and attention mask to GPU (if available)
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             foundation_labels = batch["foundation_labels"].to(device)
             polarity_labels = batch["polarity_labels"].to(device)
 
-            # call forward on the batch
             _, foundation_logits, polarity_logits = model(
                 input_ids, attention_mask
             )
 
-            # foundation logits
-            found_preds = (torch.sigmoid(foundation_logits) > 0.5) # array stating if a foundation is predicted for an item
+            # foundation predictions
+            found_preds = (torch.sigmoid(foundation_logits) > 0.5)
 
             all_found_preds.append(found_preds.cpu())
             all_found_true.append(foundation_labels.cpu())
 
-            # polarity logits
+            # polarity predictions (masked)
             pol_preds = torch.argmax(polarity_logits, dim=2)
 
             for f in range(5):
                 mask_f = found_preds[:, f] == 1 # predicted foundations mask
 
-                # append polarity prediction if foundation is detected
                 if mask_f.sum() > 0:
                     preds_f = pol_preds[mask_f, f]
                     true_f = polarity_labels[mask_f, f]

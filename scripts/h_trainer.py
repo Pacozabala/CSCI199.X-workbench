@@ -23,7 +23,7 @@ def train_epoch(model, loader, optimizer, device, epoch):
         leave=False
     )
 
-    GradScaler(enabled=(device.type=="cuda"))
+    scaler = GradScaler(enabled=(device.type=="cuda"))
 
     for batch in loader_progress:
         input_ids = batch["input_ids"].to(device)

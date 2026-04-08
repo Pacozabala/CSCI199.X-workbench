@@ -27,9 +27,11 @@ class HierarchicalDataset(Dataset):
     
     def __getitem__(self, idx):
 
+        real_idx = self.indices[idx]
+
         return {
-            "input_ids": self.encodings["input_ids"][idx],
-            "attention_mask": self.encodings["attention_mask"][idx],
-            "foundation_labels": self.foundation_labels[idx],
-            "polarity_labels": self.polarity_labels[idx]
+            "input_ids": self.encodings["input_ids"][real_idx],
+            "attention_mask": self.encodings["attention_mask"][real_idx],
+            "foundation_labels": self.foundation_labels[real_idx],
+            "polarity_labels": self.polarity_labels[real_idx]
         }

@@ -37,7 +37,7 @@ def parse_args():
                         default="outputs")
 
     parser.add_argument("--epochs", type=int, default=3)
-    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--max_len", type=int, default=128)
     parser.add_argument("--lambda_weight", type=float, default=1.0)
@@ -91,10 +91,14 @@ def main():
 
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,
-                                shuffle=True)
+                                shuffle=True,
+                                num_workers=4,
+                                pin_memory=True)
 
         val_loader = DataLoader(val_dataset,
-                                batch_size=args.batch_size)
+                                batch_size=args.batch_size,
+                                num_workers=4,
+                                pin_memory=True)
 
         # IMPORTANT: reset model per fold
         model = HierarchicalRoBERTa(lambda_weight=args.lambda_weight)

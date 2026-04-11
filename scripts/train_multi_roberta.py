@@ -137,8 +137,8 @@ def main():
     print("Mean Foundation Macro F1: ", np.mean(foundation_scores))
 
 
-    print("Polarity Macro F1 per fold: ", polarity_scores)
-    print("Mean Polarity Macro F1: ", np.mean(polarity_scores))
+    print("Mean Polarity Macro F1 per fold: ", polarity_scores)
+    print("Mean Polarity Macro F1 overall: ", np.mean(polarity_scores))
     print("\n")
     # os.makedirs(args.output_dir, exist_ok=True)
     # torch.save(model.state_dict(),

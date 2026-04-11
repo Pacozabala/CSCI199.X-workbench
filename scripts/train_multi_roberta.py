@@ -114,17 +114,17 @@ def main():
 
         for epoch in range(args.epochs):
             train_loss, epoch_time = train_epoch(model, train_loader, optimizer, device, epoch)
-            foundation_f1, polarity_f1_set, mean_polarity_f1 = evaluate(model, val_loader, device)
+            found_macro, found_micro, pol_macro_set, pol_micro_set, mean_pol_macro, mean_pol_micro  = evaluate(model, val_loader, device)
 
             print(f"\nEpoch {epoch+1}")
             print(f"Train Loss: {train_loss:.4f}")
-            print(f"Foundation Macro F1: {foundation_f1:.4f}")
-            # for f in range(5):
-            #     print(f"{FOUNDATIONS[f]} Polarity Macro F1 (masked): {polarity_f1_set[f]:.4f}")
-            print(f"Mean Polarity Macro F1: {mean_polarity_f1:.4f}")
+            print(f"Foundation Macro F1: {found_macro:.4f}")
+            print(f"Foundation Micro F1: {found_micro:.4f}")
+            print(f"Mean Polarity Macro F1: {mean_pol_macro:.4f}")
+            print(f"Mean Polarity Micro F1: {mean_pol_micro:.4f}")
             print(f"Epoch Time: {epoch_time:.2f}s")
 
-        fold_results.append((foundation_f1, mean_polarity_f1))
+        fold_results.append((found_macro, mean_pol_macro))
 
     foundation_scores = [x[0] for x in fold_results]
     polarity_scores = [x[1] for x in fold_results]
@@ -133,12 +133,13 @@ def main():
     print(f"Summary of results")
     print(f"==============================")
 
-    print("Foundation F1 per fold: ", foundation_scores)
-    print("Mean Foundation F1: ", np.mean(foundation_scores))
+    print("Foundation Macro F1 per fold: ", foundation_scores)
+    print("Mean Foundation Macro F1: ", np.mean(foundation_scores))
 
 
-    print("Polarity F1 per fold: ", polarity_scores)
-    print("Mean Polarity F1: ", np.mean(polarity_scores))
+    print("Polarity Macro F1 per fold: ", polarity_scores)
+    print("Mean Polarity Macro F1: ", np.mean(polarity_scores))
+    print("\n")
     # os.makedirs(args.output_dir, exist_ok=True)
     # torch.save(model.state_dict(),
     #            os.path.join(args.output_dir, "hierarchical_model.pt"))

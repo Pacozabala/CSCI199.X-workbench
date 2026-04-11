@@ -83,21 +83,25 @@ def evaluate(model, loader, device):
             foundation_labels = batch["foundation_labels"].to(device)
             polarity_labels = batch["polarity_labels"].to(device)
 
+            # model forward pass
             _, foundation_logits, polarity_logits = model(
                 input_ids, attention_mask
             )
 
-            # foundation predictions
+            # convert foundation logits to predictions 
+            # sigmoid probs -> binary values
             found_preds = (torch.sigmoid(foundation_logits) > 0.5)
 
             all_found_preds.append(found_preds.cpu())
             all_found_true.append(foundation_labels.cpu())
 
-            # polarity predictions (masked)
+            # convert polarity logits to predictions
+            # choose the highest logit per foundation
             pol_preds = torch.argmax(polarity_logits, dim=2)
 
+            # loop through foundations
             for f in range(5):
-                mask_f = found_preds[:, f] == 1 # predicted foundations mask
+                mask_f = found_preds[:, f] == 1 # rows where foundation is predicted
 
                 if mask_f.sum() > 0:
                     preds_f = pol_preds[mask_f, f]
@@ -105,24 +109,37 @@ def evaluate(model, loader, device):
 
                     all_pol_preds[f].append(preds_f.cpu())
                     all_pol_true[f].append(true_f.cpu())
-        
-    foundation_f1 = f1_score(
-        torch.cat(all_found_true).numpy().flatten(),
-        torch.cat(all_found_preds).numpy().flatten(),
-        average="macro"
-    )
+    
+    found_y_true = torch.cat(all_found_true).numpy().flatten()
+    found_y_pred = torch.cat(all_found_preds).numpy().flatten()
 
-    polarity_f1_scores = []
+    found_macro_f1 = f1_score(found_y_true, found_y_pred, average="macro")
+    found_micro_f1 = f1_score(found_y_true, found_y_pred, average="micro")
+
+    pol_macro_scores = []
+    pol_micro_scores = []
     for f in range(5):
         if len(all_pol_true[f]) > 0:
             y_true = torch.cat(all_pol_true[f]).numpy()
             y_pred = torch.cat(all_pol_preds[f]).numpy()
 
-            f1 = f1_score(y_true, y_pred, average="macro")
-            polarity_f1_scores.append(f1)
+            macro_f1 = f1_score(y_true, y_pred, average="macro")
+            micro_f1 = f1_score(y_true, y_pred, average="micro")
+            
+            pol_macro_scores.append(macro_f1)
+            pol_micro_scores.append(micro_f1)
         else:
-            polarity_f1_scores.append(0.0)
+            pol_macro_scores.append(0.0)
+            pol_micro_scores.append(0.0)
     
-    mean_polarity_f1 = sum(polarity_f1_scores) / 5
+    mean_pol_macro = sum(pol_macro_scores) / 5
+    mean_pol_micro = sum(pol_micro_scores) / 5
 
-    return foundation_f1, polarity_f1_scores, mean_polarity_f1
+    return (
+        found_macro_f1,
+        found_micro_f1,
+        pol_macro_scores,
+        pol_micro_scores,
+        mean_pol_macro,
+        mean_pol_micro
+    )

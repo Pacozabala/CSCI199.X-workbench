@@ -48,14 +48,14 @@ def parse_args():
 # =========================
 # MAIN
 # =========================
-'''
-Main method
-- loads the datasets, tokenizer, optimizer
-- frames CSVs as HierarchicalDataset(s)
-- uses data loaders to pass HDs in batches to training and evaluation functions
-- trains model for specified number of epochs
-'''
 def main():
+    '''
+    Main method
+    - loads the datasets, tokenizer, optimizer
+    - frames CSVs as HierarchicalDataset(s)
+    - uses data loaders to pass HDs in batches to training and evaluation functions
+    - trains model for specified number of epochs
+    '''
     args = parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -84,6 +84,11 @@ def main():
     )
 
     fold_results = []
+
+    # metadata for model saving
+    best_f1 = 0
+    best_model_state = None
+    best_fold = -1
 
     for fold, (train_idx, val_idx) in enumerate(kf.split(df, label_matrix)):
 
@@ -124,6 +129,11 @@ def main():
             print(f"Mean Polarity Micro F1: {mean_pol_micro:.4f}")
             print(f"Epoch Time: {epoch_time:.2f}s")
 
+            if ((found_macro + mean_pol_macro) / 2)> best_f1:
+                best_f1 = mean_pol_macro
+                best_model_state = model.state_dict()
+                best_fold = fold
+
         fold_results.append((found_macro, mean_pol_macro))
 
     foundation_scores = [x[0] for x in fold_results]
@@ -136,15 +146,23 @@ def main():
     print("Foundation Macro F1 per fold: ", foundation_scores)
     print("Mean Foundation Macro F1: ", np.mean(foundation_scores))
 
-
     print("Mean Polarity Macro F1 per fold: ", polarity_scores)
     print("Mean Polarity Macro F1 overall: ", np.mean(polarity_scores))
     print("\n")
-    # os.makedirs(args.output_dir, exist_ok=True)
-    # torch.save(model.state_dict(),
-    #            os.path.join(args.output_dir, "hierarchical_model.pt"))
+    
+    os.makedirs(args.output_dir, exist_ok=True)
 
-    # print("\nModel saved.")
+    tokenizer.save_pretrained(args.output_dir)
+
+    torch.save({
+        "model_state_dict": best_model_state,
+        "best_fold": best_fold,
+        "best_f1": best_f1,
+        "lambda_weight": args.lambda_weight,
+        "max_len": args.max_len,
+        "foundations": FOUNDATIONS
+    }, os.path.join(args.output_dir, f"h_model_best.pt"))
+    print(f"\nBest model saved from fold {best_fold} with F1={best_f1:.4f}.")
 
 
 if __name__ == "__main__":

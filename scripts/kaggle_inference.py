@@ -113,3 +113,6 @@ def main():
     print("\n=== FOUNDATION + POLARITY FREQUENCIES ===")
     for k,v in pol_counter.items():
         print(f"{k}: {v}")
+
+if __name__ == "__main__":
+    main()

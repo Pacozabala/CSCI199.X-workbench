@@ -132,8 +132,8 @@ def main():
             print(f"Mean Polarity Micro F1: {mean_pol_micro:.4f}")
             print(f"Epoch Time: {epoch_time:.2f}s")
 
-            if ((found_macro + mean_pol_macro) / 2) > best_pol_f1:
-                best_pol_f1 = (found_macro + mean_pol_macro) / 2
+            if mean_pol_macro > best_pol_f1:
+                best_pol_f1 = mean_pol_macro
                 best_model_state = model.state_dict()
                 best_fold = fold
 

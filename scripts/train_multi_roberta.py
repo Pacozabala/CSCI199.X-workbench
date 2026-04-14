@@ -20,7 +20,7 @@ FOUNDATIONS = ["authority", "fairness", "harm", "ingroup", "purity"]
 '''
 Parses CL args.
 --data_dir: input directory
---output_dir: output directory for the saved model
+--model_dir: output directory for the saved model
 --epochs: number of training epochs
 --batch_size: number of data entries processed at once.
 --lr: learning rate.
@@ -154,7 +154,7 @@ def main():
     print("\n")
     
     os.makedirs(args.tokenizer_dir, exist_ok=True)
-    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(args.model_dir, exist_ok=True)
     
 
     tokenizer.save_pretrained(args.tokenizer_dir)
@@ -166,7 +166,7 @@ def main():
         "lambda_weight": args.lambda_weight,
         "max_len": args.max_len,
         "foundations": FOUNDATIONS
-    }, os.path.join(args.output_dir, f"h_model_best.pt"))
+    }, os.path.join(args.model_dir, f"h_model_best.pt"))
     print(f"\nBest model saved from fold {best_fold} with F1={best_f1:.4f}.")
 
 

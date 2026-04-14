@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader
-from transformers import RobertaTokenizer
+from transformers import RobertaTokenizer, logging
 from torch.optim import AdamW
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 
@@ -60,6 +60,9 @@ def main():
     - trains model for specified number of epochs
     '''
     args = parse_args()
+
+    logging.set_verbosity_error()
+    logging.disable_progress_bar()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -124,13 +127,21 @@ def main():
             train_loss, epoch_time = train_epoch(model, train_loader, optimizer, device, epoch)
             found_macro, found_micro, pol_macro_set, pol_micro_set, mean_pol_macro, mean_pol_micro  = evaluate(model, val_loader, device)
 
-            print(f"\nEpoch {epoch+1}")
-            print(f"Train Loss: {train_loss:.4f}")
-            print(f"Foundation Macro F1: {found_macro:.4f}")
-            print(f"Foundation Micro F1: {found_micro:.4f}")
-            print(f"Mean Polarity Macro F1: {mean_pol_macro:.4f}")
-            print(f"Mean Polarity Micro F1: {mean_pol_micro:.4f}")
-            print(f"Epoch Time: {epoch_time:.2f}s")
+            print(
+                f"""
+                \nEpoch {epoch+1}
+                --------------------------------
+                Train Loss              : {train_loss:.4f}
+                Foundation Macro F1     : {found_macro:.4f}
+                Foundation Micro F1     : {found_micro:.4f}
+                Polarity Macro F1 (avg) : {mean_pol_macro:.4f}
+                Polarity Micro F1 (avg) : {mean_pol_micro:.4f}
+                Epoch Time              : {epoch_time:.2f}s
+                """
+            )
+            print("Polarity Macro F1 per foundation:")
+            for f, score in zip(FOUNDATIONS, pol_macro_set):
+                print(f"  {f:<10}: {score:.4f}")
 
             if mean_pol_macro > best_pol_f1:
                 best_pol_f1 = mean_pol_macro
@@ -143,7 +154,7 @@ def main():
     polarity_scores = [x[1] for x in fold_results]
 
     print(f"\n==============================")
-    print(f"Summary of results")
+    print(f"CROSS-VALIDATION SUMMARY")
     print(f"==============================")
 
     print("Foundation Macro F1 per fold: ", foundation_scores)
@@ -167,7 +178,7 @@ def main():
         "max_len": args.max_len,
         "foundations": FOUNDATIONS
     }, os.path.join(args.model_dir, f"h_model_best.pt"))
-    print(f"\nBest model saved from fold {best_fold} with F1={best_pol_f1:.4f}.")
+    print(f"\nBest model saved from fold {best_fold} with Polarity Macro F1={best_pol_f1:.4f}.")
 
 
 if __name__ == "__main__":

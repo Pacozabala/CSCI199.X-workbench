@@ -2,7 +2,7 @@ import torch
 import argparse
 import pandas as pd
 
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, logging
 from collections import Counter
 from h_model import HierarchicalRoBERTa
 
@@ -38,6 +38,9 @@ def parse_args():
 # =========================
 def main():
     args = parse_args()
+
+    logging.set_verbosity_error()
+    logging.disable_progress_bar()
 
     # CONFIG
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

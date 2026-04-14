@@ -33,8 +33,11 @@ def parse_args():
     parser.add_argument("--data_dir", type=str,
                         default="data/hierarchical_dataset")
 
-    parser.add_argument("--output_dir", type=str,
+    parser.add_argument("--model_dir", type=str,
                         default="models")
+    
+    parser.add_argument("--tokenizer_dir", type=str,
+                        default="tokenizer")
 
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
@@ -150,9 +153,11 @@ def main():
     print("Mean Polarity Macro F1 overall: ", np.mean(polarity_scores))
     print("\n")
     
+    os.makedirs(args.tokenizer_dir, exist_ok=True)
     os.makedirs(args.output_dir, exist_ok=True)
+    
 
-    tokenizer.save_pretrained(args.output_dir)
+    tokenizer.save_pretrained(args.tokenizer_dir)
 
     torch.save({
         "model_state_dict": best_model_state,

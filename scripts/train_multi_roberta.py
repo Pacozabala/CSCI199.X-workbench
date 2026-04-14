@@ -129,14 +129,14 @@ def main():
 
             print(
                 f"""
-                \nEpoch {epoch+1}
-                --------------------------------
-                Train Loss              : {train_loss:.4f}
-                Foundation Macro F1     : {found_macro:.4f}
-                Foundation Micro F1     : {found_micro:.4f}
-                Polarity Macro F1 (avg) : {mean_pol_macro:.4f}
-                Polarity Micro F1 (avg) : {mean_pol_micro:.4f}
-                Epoch Time              : {epoch_time:.2f}s
+\nEpoch {epoch+1}
+--------------------------------
+Train Loss              : {train_loss:.4f}
+Foundation Macro F1     : {found_macro:.4f}
+Foundation Micro F1     : {found_micro:.4f}
+Polarity Macro F1 (avg) : {mean_pol_macro:.4f}
+Polarity Micro F1 (avg) : {mean_pol_micro:.4f}
+Epoch Time              : {epoch_time:.2f}s
                 """
             )
             print("Polarity Macro F1 per foundation:")

@@ -92,3 +92,24 @@ def main():
 
     for i in range(0, len(texts), args.batch_size):
         batch = texts[i:i+args.batch_size]
+
+        found_preds, pol_preds = predict_batch(batch)
+
+        for f_pred, p_pred in zip(found_preds, pol_preds):
+            for idx, is_present in enumerate(f_pred):
+                if is_present:
+                    found_label = FOUNDATIONS[idx]
+                    pol_label = POLARITY[p_pred[idx].item()]
+
+                    found_counter[found_label] += 1
+                    pol_counter[f"{found_label}.{pol_label}"] += 1
+
+    
+    # OUTPUT RESULTS
+    print("\n=== FOUNDATION FREQUENCIES ===")
+    for k,v in found_counter.items():
+        print(f"{k}: v")
+
+    print("\n=== FOUNDATION + POLARITY FREQUENCIES ===")
+    for k,v in pol_counter.items():
+        print(f"{k}: {v}")

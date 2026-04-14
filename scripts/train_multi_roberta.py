@@ -89,7 +89,7 @@ def main():
     fold_results = []
 
     # metadata for model saving
-    best_f1 = 0
+    best_pol_f1 = 0
     best_model_state = None
     best_fold = -1
 
@@ -132,8 +132,8 @@ def main():
             print(f"Mean Polarity Micro F1: {mean_pol_micro:.4f}")
             print(f"Epoch Time: {epoch_time:.2f}s")
 
-            if ((found_macro + mean_pol_macro) / 2)> best_f1:
-                best_f1 = mean_pol_macro
+            if ((found_macro + mean_pol_macro) / 2) > best_pol_f1:
+                best_pol_f1 = (found_macro + mean_pol_macro) / 2
                 best_model_state = model.state_dict()
                 best_fold = fold
 
@@ -162,12 +162,12 @@ def main():
     torch.save({
         "model_state_dict": best_model_state,
         "best_fold": best_fold,
-        "best_f1": best_f1,
+        "best_pol_f1": best_pol_f1,
         "lambda_weight": args.lambda_weight,
         "max_len": args.max_len,
         "foundations": FOUNDATIONS
     }, os.path.join(args.model_dir, f"h_model_best.pt"))
-    print(f"\nBest model saved from fold {best_fold} with F1={best_f1:.4f}.")
+    print(f"\nBest model saved from fold {best_fold} with F1={best_pol_f1:.4f}.")
 
 
 if __name__ == "__main__":

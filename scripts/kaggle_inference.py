@@ -14,7 +14,7 @@ def parse_args():
 
     parser.add_argument("--data_path",
                         type=str,
-                        default="data/kaggle_dataset.csv") # TODO: adjust csv name later
+                        default="data/kaggle_filtered.csv")
     parser.add_argument("--model_path",
                         type=str,
                         default="models/h_model_best.pt")
@@ -31,7 +31,7 @@ def parse_args():
                         type=int,
                         default=32)
 
-    return parser
+    return parser.parse_args()
 
 # =========================
 # MAIN
@@ -58,7 +58,7 @@ def main():
     # LOAD DATASET (KAGGLE CSV)
     df = pd.read_csv(args.data_path)
 
-    texts = df["text"].tolist() # TODO: fix column name
+    texts = df["self_text"].tolist()
 
     # INFERENCE FUNCTION
     def predict_batch(text_batch):
@@ -108,7 +108,7 @@ def main():
     # OUTPUT RESULTS
     print("\n=== FOUNDATION FREQUENCIES ===")
     for k,v in found_counter.items():
-        print(f"{k}: v")
+        print(f"{k}: {v}")
 
     print("\n=== FOUNDATION + POLARITY FREQUENCIES ===")
     for k,v in pol_counter.items():

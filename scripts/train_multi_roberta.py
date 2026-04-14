@@ -20,7 +20,7 @@ FOUNDATIONS = ["authority", "fairness", "harm", "ingroup", "purity"]
 '''
 Parses CL args.
 --data_dir: input directory
---output_dir: output directory
+--output_dir: output directory for the saved model
 --epochs: number of training epochs
 --batch_size: number of data entries processed at once.
 --lr: learning rate.
@@ -34,7 +34,7 @@ def parse_args():
                         default="data/hierarchical_dataset")
 
     parser.add_argument("--output_dir", type=str,
-                        default="outputs")
+                        default="models")
 
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)

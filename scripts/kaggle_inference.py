@@ -1,3 +1,4 @@
+import json
 import torch
 import argparse
 import numpy as np
@@ -24,7 +25,7 @@ def parse_args():
                         default="tokenizer/")
     parser.add_argument("--output_path",
                         type=str,
-                        default="outputs/")
+                        default="results/")
     parser.add_argument("--max_len",
                         type=int,
                         default=128)
@@ -133,45 +134,37 @@ def main():
             # NEW: accumulate total foundations predicted
             total_foundations_predicted += foundations_in_text
 
-    
-    # OUTPUT RESULTS
-    print("\n=== FOUNDATION FREQUENCIES ===")
-    for k,v in found_counter.items():
-        print(f"{k}: {v}")
+    results = {
+        "foundation_frequencies": dict(found_counter),
+        "foundation_distribution_pct": {
+            k: v / sum(found_counter.values())
+            for k, v in found_counter.items()
+        },
+        "global_polarity_distribution": {
+            pol: global_pol_counter[pol] / sum(global_pol_counter.values())
+            for pol in POLARITY
+        },
+        "avg_foundations_per_text": total_foundations_predicted / total_texts,
+        "foundation_polarity_normalized": {
+            f: {
+                pol: foundation_pol_counter[f][pol] /
+                    sum(foundation_pol_counter[f].values())
+                    if sum(foundation_pol_counter[f].values()) > 0 else 0
+                for pol in POLARITY
+            }
+            for f in FOUNDATIONS
+        },
+        "foundation_polarity_frequencies": {
+            k: v for k, v in pol_counter.items()
+        }
+    }
 
-    print("\n=== FOUNDATION + POLARITY FREQUENCIES ===")
-    for k,v in pol_counter.items():
-        print(f"{k}: {v}")
+    output_file = f"{args.output_path}/inference_stats.json"
 
-    total_found = sum(found_counter.values())
+    with open(output_file, "w") as f:
+        json.dump(results, f, indent=4)
 
-    print("\n=== FOUNDATION DISTRIBUTION (%) ===")
-    for k, v in found_counter.items():
-        print(f"{k}: {v/total_found:.4f}")
-
-    print("\n=== NORMALIZED POLARITY PER FOUNDATION ===")
-    for foundation, pol_counts in foundation_pol_counter.items():
-        total = sum(pol_counts.values())
-        if total == 0:
-            continue
-
-        print(f"\n{foundation}:")
-        for pol in POLARITY:
-            val = pol_counts[pol] / total if total > 0 else 0
-            print(f"  {pol}: {val:.4f}")
-
-    print("\n=== GLOBAL POLARITY DISTRIBUTION (%) ===")
-    total_global_pol = sum(global_pol_counter.values())
-
-    for pol in POLARITY:
-        val = global_pol_counter[pol] / total_global_pol if total_global_pol > 0 else 0
-        print(f"{pol}: {val:.4f}")
-
-    
-
-    avg_foundations = total_foundations_predicted / total_texts if total_texts > 0 else 0
-    print("\n=== AVERAGE FOUNDATIONS PER TEXT ===")
-    print(f"{avg_foundations:.4f}")
+    print(f"\nSaved inference statistics to: {output_file}")
 
 if __name__ == "__main__":
     main()

@@ -89,18 +89,26 @@ def main():
         return_tensors="pt"
     )
 
-    fold_results = []
-
     # metadata for model saving
-    best_pol_f1 = 0
+    best_pol_f1 = -1
     best_model_state = None
     best_fold = -1
+
+    # arrays for training logs
+    epoch_logs = []
+    fold_logs = []
 
     for fold, (train_idx, val_idx) in enumerate(kf.split(df, label_matrix)):
 
         print(f"\n==============================")
         print(f"FOLD {fold+1}")
         print(f"==============================")
+
+        # track best per fold
+        fold_best_pol_f1 = -1
+        fold_best_epoch = -1
+        fold_best_found_macro = 0
+
 
         # prepare the data into dataloaders
         train_dataset = HierarchicalDataset(df, encodings, train_idx)
@@ -127,31 +135,52 @@ def main():
             train_loss, epoch_time = train_epoch(model, train_loader, optimizer, device, epoch)
             found_macro, found_micro, pol_macro_set, pol_micro_set, mean_pol_macro, mean_pol_micro  = evaluate(model, val_loader, device)
 
-            print(
-                f"""
-\nEpoch {epoch+1}
---------------------------------
-Train Loss              : {train_loss:.4f}
-Foundation Macro F1     : {found_macro:.4f}
-Foundation Micro F1     : {found_micro:.4f}
-Polarity Macro F1 (avg) : {mean_pol_macro:.4f}
-Polarity Micro F1 (avg) : {mean_pol_micro:.4f}
-Epoch Time              : {epoch_time:.2f}s
-                """
-            )
-            print("Polarity Macro F1 per foundation:")
-            for f, score in zip(FOUNDATIONS, pol_macro_set):
-                print(f"  {f:<10}: {score:.4f}")
+            # save per-epoch data to logs
+            epoch_logs.append({
+                "fold": fold + 1,
+                "epoch": epoch + 1,
+                "train_loss": train_loss,
+                "found_macro": found_macro,
+                "found_micro": found_micro,
+                "pol_macro_mean": mean_pol_macro,
+                "pol_micro_mean": mean_pol_micro,
+                "epoch_time": epoch_time,
+                **{f"pol_macro_{f}": s for f, s in zip(FOUNDATIONS, pol_macro_set)},
+                **{f"pol_micro_{f}": s for f, s in zip(FOUNDATIONS, pol_micro_set)},
+            })
 
+            # minimize printing
+            print(f"\nEpoch {epoch+1}")
+            print("="*50)
+            print(f"{'Metric':<30} {'Score':>10}")
+            print("-"*50)
+
+            print(f"{'Train Loss':<30} {train_loss:>10.4f}")
+            print(f"{'Foundation Macro F1':<30} {found_macro:>10.4f}")
+            print(f"{'Polarity Macro F1 (avg)':<30} {mean_pol_macro:>10.4f}")
+            print(f"{'Epoch Time (s)':<30} {epoch_time:>10.2f}")
+
+            # update fold best (always per fold)
+            if mean_pol_macro > fold_best_pol_f1:
+                fold_best_pol_f1 = mean_pol_macro
+                fold_best_found_macro = found_macro
+                fold_best_epoch = epoch + 1
+            
+            # update global best
             if mean_pol_macro > best_pol_f1:
                 best_pol_f1 = mean_pol_macro
                 best_model_state = model.state_dict()
-                best_fold = fold
+                best_fold = fold + 1
 
-        fold_results.append((found_macro, mean_pol_macro))
+        fold_logs.append({
+            "fold": fold + 1,
+            "best_epoch": fold_best_epoch,
+            "best_found_macro": fold_best_found_macro,
+            "best_pol_macro": fold_best_pol_f1
+        })
 
-    foundation_scores = [x[0] for x in fold_results]
-    polarity_scores = [x[1] for x in fold_results]
+    foundation_scores = fold_df["best_found_macro"]
+    polarity_scores = fold_df["best_pol_macro"]
 
     print(f"\n==============================")
     print(f"CROSS-VALIDATION SUMMARY")
@@ -163,11 +192,33 @@ Epoch Time              : {epoch_time:.2f}s
     print("Mean Polarity Macro F1 per fold: ", polarity_scores)
     print("Mean Polarity Macro F1 overall: ", np.mean(polarity_scores))
     print("\n")
-    
+
+    # convert logs to csv and save
+    epoch_df = pd.DataFrame(epoch_logs)
+    fold_df = pd.DataFrame(fold_logs)
+
+    os.makedirs("results", exist_ok=True)
+    epoch_df.to_csv("results/epoch_logs.csv", index=False)
+    fold_df.to_csv("results/fold_summary.csv", index=False)
+
+    summary_df = pd.DataFrame({
+        "metric": ["foundation_macro", "polarity_macro"],
+        "mean": [
+            fold_df["best_found_macro"].mean(),
+            fold_df["best_pol_macro"].mean()
+        ],
+        "std": [
+            fold_df["best_found_macro"].std(),
+            fold_df["best_pol_macro"].std()
+        ]
+    })
+
+    summary_df.to_csv("results/summary.csv", index=False)
+
+    # MODEL AND TOKENIZER SAVING
     os.makedirs(args.tokenizer_dir, exist_ok=True)
     os.makedirs(args.model_dir, exist_ok=True)
     
-
     tokenizer.save_pretrained(args.tokenizer_dir)
 
     torch.save({

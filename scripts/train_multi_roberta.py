@@ -197,8 +197,6 @@ def main():
     print("Mean Polarity Macro F1 overall: ", np.mean(polarity_scores))
     print("\n")
 
-    
-
     os.makedirs("results", exist_ok=True)
     epoch_df.to_csv("results/epoch_logs.csv", index=False)
     fold_df.to_csv("results/fold_summary.csv", index=False)

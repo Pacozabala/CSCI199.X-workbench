@@ -94,19 +94,44 @@ def main():
     found_counter = Counter()
     pol_counter = Counter()
 
+    # statistics trackers
+    total_texts = len(texts)
+    total_foundations_predicted = 0
+
+    # track polarity counts globally
+    global_pol_counter = Counter()
+
+    # track per-foundation polarity counts
+    foundation_pol_counter = {
+        f: Counter() for f in FOUNDATIONS
+}
+
     for i in range(0, len(texts), args.batch_size):
         batch = texts[i:i+args.batch_size]
 
         found_preds, pol_preds = predict_batch(batch)
 
         for f_pred, p_pred in zip(found_preds, pol_preds):
+            foundations_in_text = 0  # count per sample
+
             for idx, is_present in enumerate(f_pred):
                 if is_present:
+                    foundations_in_text += 1
+
                     found_label = FOUNDATIONS[idx]
                     pol_label = POLARITY[p_pred[idx].item()]
 
                     found_counter[found_label] += 1
                     pol_counter[f"{found_label}.{pol_label}"] += 1
+
+                    # NEW: track per-foundation polarity
+                    foundation_pol_counter[found_label][pol_label] += 1
+
+                    # NEW: track global polarity
+                    global_pol_counter[pol_label] += 1
+
+            # NEW: accumulate total foundations predicted
+            total_foundations_predicted += foundations_in_text
 
     
     # OUTPUT RESULTS
@@ -123,6 +148,30 @@ def main():
     print("\n=== FOUNDATION DISTRIBUTION (%) ===")
     for k, v in found_counter.items():
         print(f"{k}: {v/total_found:.4f}")
+
+    print("\n=== NORMALIZED POLARITY PER FOUNDATION ===")
+    for foundation, pol_counts in foundation_pol_counter.items():
+        total = sum(pol_counts.values())
+        if total == 0:
+            continue
+
+        print(f"\n{foundation}:")
+        for pol in POLARITY:
+            val = pol_counts[pol] / total if total > 0 else 0
+            print(f"  {pol}: {val:.4f}")
+
+    print("\n=== GLOBAL POLARITY DISTRIBUTION (%) ===")
+    total_global_pol = sum(global_pol_counter.values())
+
+    for pol in POLARITY:
+        val = global_pol_counter[pol] / total_global_pol if total_global_pol > 0 else 0
+        print(f"{pol}: {val:.4f}")
+
+    
+
+    avg_foundations = total_foundations_predicted / total_texts if total_texts > 0 else 0
+    print("\n=== AVERAGE FOUNDATIONS PER TEXT ===")
+    print(f"{avg_foundations:.4f}")
 
 if __name__ == "__main__":
     main()

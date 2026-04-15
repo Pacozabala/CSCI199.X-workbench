@@ -179,8 +179,8 @@ def main():
             "best_pol_macro": fold_best_pol_f1
         })
 
-    foundation_scores = fold_df["best_found_macro"]
-    polarity_scores = fold_df["best_pol_macro"]
+    foundation_scores = fold_logs["best_found_macro"]
+    polarity_scores = fold_logs["best_pol_macro"]
 
     print(f"\n==============================")
     print(f"CROSS-VALIDATION SUMMARY")

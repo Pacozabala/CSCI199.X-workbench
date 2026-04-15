@@ -179,8 +179,12 @@ def main():
             "best_pol_macro": fold_best_pol_f1
         })
 
-    foundation_scores = fold_logs["best_found_macro"]
-    polarity_scores = fold_logs["best_pol_macro"]
+    # convert logs to df
+    epoch_df = pd.DataFrame(epoch_logs)
+    fold_df = pd.DataFrame(fold_logs)
+
+    foundation_scores = fold_df["best_found_macro"]
+    polarity_scores = fold_df["best_pol_macro"]
 
     print(f"\n==============================")
     print(f"CROSS-VALIDATION SUMMARY")
@@ -193,9 +197,7 @@ def main():
     print("Mean Polarity Macro F1 overall: ", np.mean(polarity_scores))
     print("\n")
 
-    # convert logs to csv and save
-    epoch_df = pd.DataFrame(epoch_logs)
-    fold_df = pd.DataFrame(fold_logs)
+    
 
     os.makedirs("results", exist_ok=True)
     epoch_df.to_csv("results/epoch_logs.csv", index=False)

@@ -1,5 +1,6 @@
 import torch
 import argparse
+import numpy as np
 import pandas as pd
 
 from transformers import AutoTokenizer, logging
@@ -116,6 +117,12 @@ def main():
     print("\n=== FOUNDATION + POLARITY FREQUENCIES ===")
     for k,v in pol_counter.items():
         print(f"{k}: {v}")
+
+    total_found = sum(found_counter.values())
+
+    print("\n=== FOUNDATION DISTRIBUTION (%) ===")
+    for k, v in found_counter.items():
+        print(f"{k}: {v/total_found:.4f}")
 
 if __name__ == "__main__":
     main()

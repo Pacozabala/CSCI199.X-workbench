@@ -1,4 +1,5 @@
 import json
+import os
 import torch
 import argparse
 import numpy as np
@@ -14,7 +15,7 @@ from h_model import HierarchicalRoBERTa
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data_path",
+    parser.add_argument("--input_csv_path",
                         type=str,
                         default="data/kaggle_filtered.csv")
     parser.add_argument("--model_path",
@@ -23,9 +24,9 @@ def parse_args():
     parser.add_argument("--tokenizer",
                         type=str,
                         default="tokenizer/")
-    parser.add_argument("--output_path",
+    parser.add_argument("--output_json_path",
                         type=str,
-                        default="results/")
+                        default="results/inference_stats.json")
     parser.add_argument("--max_len",
                         type=int,
                         default=128)
@@ -61,7 +62,7 @@ def main():
     model.eval()
 
     # LOAD DATASET (KAGGLE CSV)
-    df = pd.read_csv(args.data_path)
+    df = pd.read_csv(args.input_csv_path)
 
     texts = df["self_text"].tolist()
 
@@ -95,76 +96,35 @@ def main():
     found_counter = Counter()
     pol_counter = Counter()
 
-    # statistics trackers
-    total_texts = len(texts)
-    total_foundations_predicted = 0
-
-    # track polarity counts globally
-    global_pol_counter = Counter()
-
-    # track per-foundation polarity counts
-    foundation_pol_counter = {
-        f: Counter() for f in FOUNDATIONS
-}
-
     for i in range(0, len(texts), args.batch_size):
         batch = texts[i:i+args.batch_size]
 
         found_preds, pol_preds = predict_batch(batch)
 
         for f_pred, p_pred in zip(found_preds, pol_preds):
-            foundations_in_text = 0  # count per sample
 
             for idx, is_present in enumerate(f_pred):
                 if is_present:
-                    foundations_in_text += 1
-
                     found_label = FOUNDATIONS[idx]
                     pol_label = POLARITY[p_pred[idx].item()]
 
                     found_counter[found_label] += 1
                     pol_counter[f"{found_label}.{pol_label}"] += 1
 
-                    # NEW: track per-foundation polarity
-                    foundation_pol_counter[found_label][pol_label] += 1
-
-                    # NEW: track global polarity
-                    global_pol_counter[pol_label] += 1
-
-            # NEW: accumulate total foundations predicted
-            total_foundations_predicted += foundations_in_text
-
     results = {
         "foundation_frequencies": dict(found_counter),
-        "foundation_distribution_pct": {
-            k: v / sum(found_counter.values())
-            for k, v in found_counter.items()
-        },
-        "global_polarity_distribution": {
-            pol: global_pol_counter[pol] / sum(global_pol_counter.values())
-            for pol in POLARITY
-        },
-        "avg_foundations_per_text": total_foundations_predicted / total_texts,
-        "foundation_polarity_normalized": {
-            f: {
-                pol: foundation_pol_counter[f][pol] /
-                    sum(foundation_pol_counter[f].values())
-                    if sum(foundation_pol_counter[f].values()) > 0 else 0
-                for pol in POLARITY
-            }
-            for f in FOUNDATIONS
-        },
-        "foundation_polarity_frequencies": {
-            k: v for k, v in pol_counter.items()
-        }
+        "foundation_polarity_frequencies": dict(pol_counter)
     }
 
-    output_file = f"{args.output_path}/inference_stats.json"
+    output_dir = os.path.dirname(args.output_json_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
 
-    with open(output_file, "w") as f:
+
+    with open(args.output_json_path, "w") as f:        
         json.dump(results, f, indent=4)
 
-    print(f"\nSaved inference statistics to: {output_file}")
+    print(f"\nSaved inference statistics to: {args.output_json_path}")
 
 if __name__ == "__main__":
     main()

@@ -38,6 +38,9 @@ def parse_args():
     
     parser.add_argument("--tokenizer_dir", type=str,
                         default="tokenizer")
+    
+    parser.add_argument("--results_dir", type=str,
+                        default="results")
 
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
@@ -197,9 +200,10 @@ def main():
     print("Mean Polarity Macro F1 overall: ", np.mean(polarity_scores))
     print("\n")
 
-    os.makedirs("results", exist_ok=True)
-    epoch_df.to_csv("results/epoch_logs.csv", index=False)
-    fold_df.to_csv("results/fold_summary.csv", index=False)
+    os.makedirs(args.results_dir, exist_ok=True)
+    epoch_df.to_csv(os.path.join(args.results_dir, "epoch_logs.csv"), index=False)
+    fold_df.to_csv(os.path.join(args.results_dir, "fold_summary.csv"), index=False)
+
 
     summary_df = pd.DataFrame({
         "metric": ["foundation_macro", "polarity_macro"],
@@ -213,7 +217,7 @@ def main():
         ]
     })
 
-    summary_df.to_csv("results/summary.csv", index=False)
+    summary_df.to_csv(os.path.join(args.results_dir, "summary.csv"), index=False)
 
     # MODEL AND TOKENIZER SAVING
     os.makedirs(args.tokenizer_dir, exist_ok=True)

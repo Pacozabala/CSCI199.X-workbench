@@ -31,3 +31,42 @@ python scripts/prep_binary_data.py --input "data/MFRC_polarity.csv"
 ```[bash]
 python scripts/train_roberta.py --foundation authority --pole vice
 ```
+
+
+## Multi-method methodology (bow, llama_zeroshot, llama_fewshot)
+
+Use the same directory naming convention for each method to keep experiments comparable.
+
+### 1) Prepare method-specific source files
+
+- `bow` method input: `data/MFRC_polarity.csv` (created by `bow_polarity_label.py`).
+- `llama_zeroshot` method input: `data/llama_zeroshot_data.csv`.
+- `llama_fewshot` method input: `data/llama_fewshot_data.csv`.
+
+### 2) Run all methods with explicit output folders
+
+```bash
+for method in bow llama_zeroshot llama_fewshot; do
+  if [ "$method" = "bow" ]; then
+    input_file="data/MFRC_polarity.csv"
+  else
+    input_file="data/${method}_data.csv"
+  fi
+
+  python scripts/prep_multi_data.py \
+    --input "$input_file" \
+    --output "data/hierarchical_dataset_${method}"
+
+  python scripts/train_multi_roberta.py \
+    --data_dir "data/hierarchical_dataset_${method}" \
+    --model_dir "models/${method}" \
+    --tokenizer_dir "tokenizer/${method}" \
+    --results_dir "results/${method}"
+done
+```
+
+This produces separate data folders for each method:
+- Dataset: `data/hierarchical_dataset_<method>/...`
+- Model: `models/<method>/...`
+- Tokenizer: `tokenizer/<method>/...`
+- Metrics/logs: `results/<method>/...`

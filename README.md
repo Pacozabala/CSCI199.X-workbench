@@ -40,8 +40,17 @@ Use the same directory naming convention for each method to keep experiments com
 ### 1) Prepare method-specific source files
 
 - `bow` method input: `data/MFRC_polarity.csv` (created by `bow_polarity_label.py`).
-- `llama_zeroshot` method input: `data/llama_zeroshot_data.csv`.
-- `llama_fewshot` method input: `data/llama_fewshot_data.csv`.
+- LLaMA method inputs must be converted first:
+
+```bash
+python scripts/convert_llama_to_polarity.py \
+  --input_path data/llama_zeroshot_data.csv \
+  --output_path data/MFRC_multi_llama_zeroshot.csv
+
+python scripts/convert_llama_to_polarity.py \
+  --input_path data/llama_fewshot_data.csv \
+  --output_path data/MFRC_multi_llama_fewshot.csv
+```
 
 ### 2) Run all methods with explicit output folders
 
@@ -49,8 +58,10 @@ Use the same directory naming convention for each method to keep experiments com
 for method in bow llama_zeroshot llama_fewshot; do
   if [ "$method" = "bow" ]; then
     input_file="data/MFRC_polarity.csv"
+  elif [ "$method" = "llama_zeroshot" ]; then
+    input_file="data/MFRC_multi_llama_zeroshot.csv"
   else
-    input_file="data/${method}_data.csv"
+    input_file="data/MFRC_multi_llama_fewshot.csv"
   fi
 
   python scripts/prep_multi_data.py \

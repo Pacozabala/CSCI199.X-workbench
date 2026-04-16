@@ -121,7 +121,7 @@ def main():
 
     input_path = args.input_path if args.input_path else DEFAULT_MFRC
     print(f"Loading MFRC from {input_path}")
-    MFRC = pd.read_csv(DEFAULT_MFRC)
+    MFRC = pd.read_csv(input_path)
 
     # normalize foundations
     MFRC["annotation"] = MFRC["annotation"].apply(normalize_foundations)
